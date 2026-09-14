@@ -1,0 +1,16 @@
+# Inputs, outputs and local work are never committed
+data/
+results/
+logs/
+manuscript/
+slurm/
+
+# R, Python and editor artefacts
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
