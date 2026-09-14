@@ -4,10 +4,6 @@ Analysis code for a single-cell RNA-seq comparison of peripheral blood
 mononuclear cells (PBMCs) from systemic lupus erythematosus (SLE), Sjögren's
 syndrome (SjS) and healthy donors.
 
-This repository holds the analysis code only. It contains no data, no results
-and none of the hand-prepared inputs the scripts depend on, so the pipeline will
-not run as-is from a clone.
-
 ## Datasets
 
 All four datasets are public.
