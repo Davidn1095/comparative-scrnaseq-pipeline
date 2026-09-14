@@ -161,97 +161,80 @@ cat("  Saved", nrow(signatures), "signature rows\n")
 
 cat("\nRunning GSEA pathway enrichment...\n")
 
-has_msigdbr <- requireNamespace("msigdbr", quietly = TRUE)
-has_fgsea <- requireNamespace("fgsea", quietly = TRUE)
+if (!requireNamespace("fgsea", quietly = TRUE)) {
+  stop("fgsea is not installed, so GSEA cannot run and the pathway results would be ",
+       "missing. Install fgsea (Bioconductor).", call. = FALSE)
+}
+library(fgsea)
 
-# Fallback: use cached msigdb RDS if msigdbr is not installed
-# MSigDB 2025.1 Hs cache in msigdbr's format; set MSIGDB_RDS to use another location.
+# Hallmark sets of the pinned MSigDB release. The cache is built on first use by
+# load_msigdb_hallmark() in 00_utils.R; set MSIGDB_RDS to use another location.
 cached_msigdb <- Sys.getenv("MSIGDB_RDS", file.path(tools::R_user_dir("msigdbr", which = "data"), "msigdb.2025.1.Hs.rds"))
-use_cached <- !has_msigdbr && file.exists(cached_msigdb)
+all_pathways <- load_msigdb_hallmark(cached_msigdb)
 
-if (!has_fgsea || (!has_msigdbr && !use_cached)) {
-  cat("  WARNING: msigdbr or fgsea not installed. Skipping GSEA.\n")
-  cat("  Install with: BiocManager::install(c('msigdbr', 'fgsea'))\n")
+# Run GSEA for each disease/cell type combination
+gsea_results <- list()
+
+for (d in unique(deseq2_all$disease)) {
+  for (ct in unique(deseq2_all$cell_type[deseq2_all$disease == d])) {
+
+    de_subset <- deseq2_all %>%
+      filter(disease == d, cell_type == ct, !is.na(stat))
+
+    if (nrow(de_subset) < 100) next
+
+    # Create ranked gene list
+    ranks <- setNames(de_subset$stat, de_subset$gene)
+    ranks <- sort(ranks, decreasing = TRUE)
+
+    # Run fgsea
+    set.seed(42)
+    fgsea_res <- fgsea(
+      pathways = all_pathways,
+      stats = ranks,
+      minSize = 15,
+      maxSize = 500,
+      nproc = N_CORES
+    )
+
+    fgsea_res$disease <- d
+    fgsea_res$cell_type <- ct
+
+    gsea_results[[paste(d, ct, sep = "__")]] <- fgsea_res
+  }
+}
+
+# Combine and save
+if (length(gsea_results) > 0) {
+  gsea_combined <- bind_rows(gsea_results)
+
+  # Convert leadingEdge list column to semicolon-separated string
+  if ("leadingEdge" %in% colnames(gsea_combined)) {
+    gsea_combined$leadingEdge <- sapply(gsea_combined$leadingEdge,
+                                        function(x) paste(x, collapse = ";"))
+  }
+
+  write.table(
+    gsea_combined,
+    file.path(GSEA_DIR, "gsea_all_results.tsv"),
+    sep = "\t", quote = FALSE, row.names = FALSE
+  )
+
+  # Save significant pathways
+  gsea_sig <- gsea_combined %>%
+    filter(padj < PADJ_THRESH) %>%
+    arrange(disease, cell_type, padj)
+
+  write.table(
+    gsea_sig,
+    file.path(GSEA_DIR, "gsea_significant.tsv"),
+    sep = "\t", quote = FALSE, row.names = FALSE
+  )
+
+  cat("  GSEA complete:", nrow(gsea_sig), "significant pathway enrichments\n")
 } else {
-  library(fgsea)
-
-  if (use_cached) {
-    cat("  Using cached msigdb: ", cached_msigdb, "\n")
-    msig <- readRDS(cached_msigdb)
-    # Cached RDS uses db_gene_symbol, gs_collection, gs_subcollection
-    hallmark <- msig[msig$gs_collection == "H", ]
-    hallmark_list <- split(hallmark$db_gene_symbol, hallmark$gs_name)
-    reactome <- msig[msig$gs_collection == "C2" & msig$gs_subcollection == "CP:REACTOME", ]
-  } else {
-    library(msigdbr)
-    hallmark <- msigdbr(species = "Homo sapiens", category = "H")
-    hallmark_list <- split(hallmark$gene_symbol, hallmark$gs_name)
-    reactome <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:REACTOME")
-  }
-
-  all_pathways <- hallmark_list
-
-  # Run GSEA for each disease/cell type combination
-  gsea_results <- list()
-
-  for (d in unique(deseq2_all$disease)) {
-    for (ct in unique(deseq2_all$cell_type[deseq2_all$disease == d])) {
-
-      de_subset <- deseq2_all %>%
-        filter(disease == d, cell_type == ct, !is.na(stat))
-
-      if (nrow(de_subset) < 100) next
-
-      # Create ranked gene list
-      ranks <- setNames(de_subset$stat, de_subset$gene)
-      ranks <- sort(ranks, decreasing = TRUE)
-
-      # Run fgsea
-      set.seed(42)
-      fgsea_res <- fgsea(
-        pathways = all_pathways,
-        stats = ranks,
-        minSize = 15,
-        maxSize = 500,
-        nproc = N_CORES
-      )
-
-      fgsea_res$disease <- d
-      fgsea_res$cell_type <- ct
-
-      gsea_results[[paste(d, ct, sep = "__")]] <- fgsea_res
-    }
-  }
-
-  # Combine and save
-  if (length(gsea_results) > 0) {
-    gsea_combined <- bind_rows(gsea_results)
-
-    # Convert leadingEdge list column to semicolon-separated string
-    if ("leadingEdge" %in% colnames(gsea_combined)) {
-      gsea_combined$leadingEdge <- sapply(gsea_combined$leadingEdge,
-                                          function(x) paste(x, collapse = ";"))
-    }
-
-    write.table(
-      gsea_combined,
-      file.path(GSEA_DIR, "gsea_all_results.tsv"),
-      sep = "\t", quote = FALSE, row.names = FALSE
-    )
-
-    # Save significant pathways
-    gsea_sig <- gsea_combined %>%
-      filter(padj < PADJ_THRESH) %>%
-      arrange(disease, cell_type, padj)
-
-    write.table(
-      gsea_sig,
-      file.path(GSEA_DIR, "gsea_significant.tsv"),
-      sep = "\t", quote = FALSE, row.names = FALSE
-    )
-
-    cat("  GSEA complete:", nrow(gsea_sig), "significant pathway enrichments\n")
-  }
+  stop("GSEA produced no results: no disease and cell-type table had 100 or more genes ",
+       "with a Wald statistic, so nothing was written to ", GSEA_DIR, call. = FALSE)
 }
 
 ################################################################################

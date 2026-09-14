@@ -42,11 +42,13 @@ downloaded files in `raw/` (10x MTX, HDF5 or H5AD) and a sample sheet in `meta/`
    in `results/manuscript1_figures/toro_comparison/`:
    `toro2014_sheet1_shared_signature.csv`, `toro2014_sheet4_go_enrichment.csv`
    and `toro2014_addfile3_gain_loss.csv`.
-3. **MSigDB Hallmark gene sets.** `scripts/07_pathways.R` and
-   `scripts/08_donor_classifiers.R` read the MSigDB 2025.1 human database in
-   msigdbr's format, `msigdb.2025.1.Hs.rds`. Set `MSIGDB_RDS` to its path; the
-   default is msigdbr's user data directory. The scripts use only the 50 Hallmark
-   sets.
+3. **MSigDB Hallmark gene sets (fetched automatically).**
+   `scripts/07_pathways.R` and `scripts/08_donor_classifiers.R` use the 50
+   Hallmark sets of MSigDB release 2025.1 (human). On first run they download
+   that release's Hallmark file from the Broad MSigDB release directory and cache
+   it as `msigdb.2025.1.Hs.rds`, with a provenance file beside it. The default
+   location is msigdbr's user data directory; set `MSIGDB_RDS` to use another.
+   This step needs internet access.
 4. **SingleR reference (fetched automatically).** On first run
    `scripts/02_annotate.R` downloads the Monaco immune reference with
    `celldex::MonacoImmuneData()` and caches it under `data/references/`. This
@@ -74,7 +76,7 @@ template that sets the paths.
 | `ACC_DIR` | 01-03 | Dataset directory, `data/<disease>/<accession>`. Defaults to the working directory; accession and disease are taken from its path. |
 | `DENOISE_METHOD` | 08, 09 | Required. `limma_modulescore` is the configuration used for the classifier. |
 | `SCVI_EXTRACT` | 04a | Set to `1` to write the inputs for `04b_train_scvi.py`. |
-| `MSIGDB_RDS` | 07, 08 | Path of the MSigDB 2025.1 Hs cache. |
+| `MSIGDB_RDS` | 07, 08 | Location of the MSigDB 2025.1 Hs cache, built on first use. |
 | `REF_RDS` | 02 | Optional path of an existing SingleR reference. |
 | `ATLAS_EXTRA_R_LIB` | 05, 08, 09 | Optional extra R library searched first. |
 

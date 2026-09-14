@@ -117,6 +117,115 @@ load_atlas <- function(atlas_path = NULL) {
   seu
 }
 
+# --- MSigDB Hallmark gene sets ---
+# 07_pathways.R (GSEA) and 08_donor_classifiers.R (classifier features) both use
+# the 50 Hallmark sets of one pinned MSigDB release, read from a cache in
+# msigdbr's long format (gs_collection, gs_name, db_gene_symbol, db_version).
+# The release is pinned by the cache file name, msigdb.<release>.rds.
+#
+# If the cache is absent, the release's Hallmark GMT is downloaded from the Broad
+# MSigDB release directory and saved to the same path, holding the Hallmark
+# collection only, with a provenance sidecar (<name>.provenance.tsv). msigdbr is
+# not used to fetch: it is not in the container, and the database release it
+# serves depends on the msigdbr version, so it cannot guarantee the pinned one.
+# A cache found without a sidecar was not built by this loader: its release is
+# read from its contents, and its provenance is recorded as unknown.
+MSIGDB_HALLMARK_URL <- "https://data.broadinstitute.org/gsea-msigdb/msigdb/release/%s/h.all.v%s.symbols.gmt"
+
+load_msigdb_hallmark <- function(path) {
+  release <- sub("^msigdb\\.(.+)\\.rds$", "\\1", basename(path))
+  if (!grepl("^[0-9]{4}\\.[0-9]+\\.(Hs|Mm)$", release)) {
+    stop("Cannot read an MSigDB release from the cache name ", basename(path),
+         "; expected msigdb.<release>.rds, for example msigdb.2025.1.Hs.rds", call. = FALSE)
+  }
+  sidecar <- sub("\\.rds$", ".provenance.tsv", path)
+  now <- format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z")
+  kv_lines <- function(fields) paste(names(fields), vapply(fields, as.character, ""), sep = "\t")
+
+  if (file.exists(path)) {
+    msig <- readRDS(path)
+    need <- c("gs_collection", "gs_name", "db_gene_symbol")
+    if (!all(need %in% colnames(msig))) {
+      stop("MSigDB cache ", path, " lacks the column(s) ",
+           paste(setdiff(need, colnames(msig)), collapse = ", "), call. = FALSE)
+    }
+    held <- if ("db_version" %in% colnames(msig)) paste(unique(msig$db_version), collapse = ",") else NA
+    if (!is.na(held) && held != release) {
+      stop("MSigDB cache ", path, " holds release ", held, " but its name pins ", release,
+           "; rename or remove it", call. = FALSE)
+    }
+    if (file.exists(sidecar)) {
+      kv <- utils::read.delim(sidecar, header = FALSE, col.names = c("key", "value"),
+                              colClasses = "character", quote = "")
+      prov <- as.list(stats::setNames(kv$value, kv$key))
+      log_msg("MSigDB ", prov$msigdb_release, " cache ", path, ": ", prov$provenance,
+              if (!is.null(prov$fetched)) paste0(", fetched ", prov$fetched) else "")
+    } else {
+      prov <- list(
+        msigdb_release = if (is.na(held)) "unrecorded in the cache" else held,
+        provenance     = paste("UNKNOWN: this cache predates the loader and was not built by the",
+                               "pipeline; the tool, version and date of its download were not recorded"),
+        file_modified  = format(file.mtime(path), "%Y-%m-%d %H:%M:%S %Z"),
+        rows           = nrow(msig),
+        collections    = paste(sort(unique(msig$gs_collection)), collapse = ","),
+        recorded       = now)
+      written <- tryCatch({ writeLines(kv_lines(prov), sidecar); TRUE }, error = function(e) FALSE)
+      log_msg("MSigDB cache ", path, ": provenance UNKNOWN (not built by this pipeline). Release ",
+              prov$msigdb_release, ", read from its contents. ",
+              if (written) paste0("Recorded in ", sidecar) else paste0("Could not write ", sidecar))
+    }
+  } else {
+    url <- sprintf(MSIGDB_HALLMARK_URL, release, release)
+    log_msg("MSigDB cache not found at ", path, "; downloading the ", release,
+            " Hallmark sets from ", url)
+    gmt <- tempfile(fileext = ".gmt")
+    err <- tryCatch({ utils::download.file(url, gmt, mode = "wb", quiet = TRUE); NULL },
+                    error = function(e) conditionMessage(e),
+                    warning = function(w) conditionMessage(w))
+    if (!is.null(err) || !file.exists(gmt) || file.size(gmt) == 0) {
+      stop("Could not download the MSigDB ", release, " Hallmark gene sets from ", url,
+           ", so the cache at ", path, " could not be built. The download needs internet ",
+           "access; run once on a machine that has it. Underlying error: ",
+           if (is.null(err)) "empty download" else err, call. = FALSE)
+    }
+    parts <- strsplit(readLines(gmt, warn = FALSE), "\t", fixed = TRUE)
+    if (length(parts) != 50L || !all(startsWith(vapply(parts, `[`, "", 1), "HALLMARK_"))) {
+      stop("The file downloaded from ", url, " does not hold the 50 Hallmark sets; ",
+           "nothing was saved to ", path, call. = FALSE)
+    }
+    msig <- do.call(rbind, lapply(parts, function(p) data.frame(
+      gs_collection = "H", gs_name = p[1], db_gene_symbol = unique(p[-(1:2)]),
+      db_version = release, stringsAsFactors = FALSE)))
+    dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+    tmp <- paste0(path, ".tmp")
+    saved <- tryCatch({ saveRDS(msig, tmp); file.rename(tmp, path) }, error = function(e) FALSE)
+    if (!isTRUE(saved)) {
+      unlink(tmp)
+      stop("Downloaded the MSigDB ", release, " Hallmark sets but could not save them to ", path,
+           "; check that the directory is writable.", call. = FALSE)
+    }
+    prov <- list(
+      msigdb_release = release,
+      provenance     = "downloaded by load_msigdb_hallmark() in 00_utils.R (Hallmark collection only)",
+      source         = url,
+      gmt_md5        = unname(tools::md5sum(gmt)),
+      fetched        = now,
+      sets           = length(parts),
+      genes          = length(unique(msig$db_gene_symbol)),
+      R              = paste(R.version$major, R.version$minor, sep = "."),
+      recorded       = now)
+    writeLines(kv_lines(prov), sidecar)
+    log_msg("Saved MSigDB ", release, " Hallmark sets to ", path, "; provenance in ", sidecar)
+  }
+
+  h <- msig[msig$gs_collection == "H", c("gs_name", "db_gene_symbol")]
+  sets <- lapply(split(h$db_gene_symbol, h$gs_name), unique)
+  if (length(sets) != 50L) {
+    stop("MSigDB cache ", path, " yields ", length(sets), " Hallmark sets, not 50", call. = FALSE)
+  }
+  sets
+}
+
 # --- Condition mapping for plots ---
 
 map_plot_condition <- function(seu) {

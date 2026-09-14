@@ -196,27 +196,12 @@ finalize_object <- function(x) {
 }
 
 ################################################################################
-# Path 1: Pre-built RDS (from earlier pipeline run)
+# Pre-built raw objects are refused
 ################################################################################
-
-read_raw_rds <- function(path) {
-  set.seed(1)
-  x <- readRDS(path)
-
-  ann <- read_tsv(samples_path, show_col_types = FALSE)
-  stopifnot(all(c("sample_id", "gsm_id", "condition") %in% colnames(ann)))
-
-  m_condition <- setNames(as.character(ann$condition), as.character(ann$sample_id))
-  m_gsm <- setNames(as.character(ann$gsm_id), as.character(ann$sample_id))
-
-  stopifnot("sample_id" %in% colnames(x@meta.data))
-  x$condition <- unname(m_condition[x$sample_id])
-  x$gsm_id <- unname(m_gsm[x$sample_id])
-
-  x <- ensure_metadata(x)
-  finalize_object(x)
-  return(invisible(TRUE))
-}
+# This script once preferred an <accession>_seurat_raw*.rds, when one existed,
+# over the raw data. No script in the pipeline writes such a file, so one found
+# here was built elsewhere and would silently bypass QC from the raw files.
+# Stop and name it instead.
 
 raw_candidates <- c(
   list.files(OUTDIR, pattern = paste0("^", ACCESSION, "_seurat_raw.*\\.rds$"), full.names = TRUE),
@@ -224,8 +209,9 @@ raw_candidates <- c(
 )
 raw_candidates <- raw_candidates[file.exists(raw_candidates)]
 if (length(raw_candidates) > 0) {
-  read_raw_rds(raw_candidates[1])
-  quit(save = "no", status = 0)
+  stop("Found pre-built object(s) that this pipeline does not create: ",
+       paste(raw_candidates, collapse = ", "), ". 01_qc_preproc.R builds each dataset from ",
+       "the files under ", RAW_DIR, "; move or delete the object(s) and rerun.", call. = FALSE)
 }
 
 ################################################################################

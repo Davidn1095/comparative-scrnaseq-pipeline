@@ -55,6 +55,13 @@ if (!nzchar(DENOISE_METHOD)) {
        "the producer and the consumers used to guess differently.")
 }
 stopifnot(DENOISE_METHOD %in% c("none", "scvi", "limma", "limma_modulescore"))
+if (DENOISE_METHOD == "scvi") {
+  stop("DENOISE_METHOD=scvi builds features from scVI-denoised expression in ",
+       "data/scvi_input/denoised.npy, but no script in this pipeline writes that file ",
+       "(04b_train_scvi.py saves only the latent space). The option is disabled rather than ",
+       "left to read a file of unknown origin. The reported classifier uses limma_modulescore.",
+       call. = FALSE)
+}
 log_msg("Denoising method: ", DENOISE_METHOD)
 
 OUTDIR <- switch(DENOISE_METHOD,
@@ -64,7 +71,8 @@ OUTDIR <- switch(DENOISE_METHOD,
   file.path(ATLAS_ROOT, "results", "donor_classifiers"))
 dir.create(OUTDIR, recursive = TRUE, showWarnings = FALSE)
 
-# MSigDB 2025.1 Hs cache in msigdbr's format; set MSIGDB_RDS to use another location.
+# MSigDB 2025.1 Hs cache, built on first use by load_msigdb_hallmark() in 00_utils.R;
+# set MSIGDB_RDS to use another location.
 MSIGDB_RDS <- Sys.getenv("MSIGDB_RDS", file.path(tools::R_user_dir("msigdbr", which = "data"), "msigdb.2025.1.Hs.rds"))
 FEATURE_MATRIX_PATH <- file.path(OUTDIR, "feature_matrix.rds")
 SCVI_INPUT_DIR <- file.path(ATLAS_ROOT, "data", "scvi_input")
@@ -127,12 +135,8 @@ if (file.exists(FEATURE_MATRIX_PATH) && !force_features && !cache_stale) {
     else                 log_msg("Per-cell scoring: colMeans (simple mean)")
     obj <- readRDS(file.path(OBJ_DIR, "atlas_integrated.rds"))
 
-    log_msg("Loading Hallmark gene sets from cached msigdb...")
-    msig <- readRDS(MSIGDB_RDS)
-    hallmark <- msig[msig$gs_collection == "H", c("gs_name", "db_gene_symbol")]
-    hallmark_list <- split(hallmark$db_gene_symbol, hallmark$gs_name)
-    hallmark_list <- lapply(hallmark_list, unique)
-    stopifnot(length(hallmark_list) == 50L)
+    log_msg("Loading Hallmark gene sets...")
+    hallmark_list <- load_msigdb_hallmark(MSIGDB_RDS)
 
     # Gene pool selection.
     #   limma:             HVGs (signal-carrying genes for the simple-mean path).
@@ -284,14 +288,10 @@ if (file.exists(FEATURE_MATRIX_PATH) && !force_features && !cache_stale) {
   }
 
   if (!skip_atlas_block) {
-  log_msg("Loading Hallmark gene sets from cached msigdb...")
-  msig <- readRDS(MSIGDB_RDS)
-  hallmark <- msig[msig$gs_collection == "H", c("gs_name", "db_gene_symbol")]
-  hallmark_list <- split(hallmark$db_gene_symbol, hallmark$gs_name)
-  hallmark_list <- lapply(hallmark_list, unique)
-  stopifnot(length(hallmark_list) == 50L)
+  log_msg("Loading Hallmark gene sets...")
+  hallmark_list <- load_msigdb_hallmark(MSIGDB_RDS)
   log_msg("  ", length(hallmark_list), " Hallmark sets, ",
-          length(unique(hallmark$db_gene_symbol)), " unique genes")
+          length(unique(unlist(hallmark_list))), " unique genes")
 
   # Restrict each set to genes present in the atlas
   atlas_genes <- rownames(obj)
@@ -302,107 +302,8 @@ if (file.exists(FEATURE_MATRIX_PATH) && !force_features && !cache_stale) {
           median(set_sizes), " min=", min(set_sizes), " max=", max(set_sizes))
   stopifnot(all(set_sizes >= 5))
 
-  if (DENOISE_METHOD == "scvi") {
-    # Apples-to-apples with the limma branch: simple mean of Hallmark gene
-    # expression per cell on scVI-denoised expression.
-    # Free the atlas BEFORE loading denoised, keeping only the metadata and
-    # cell-name vector we need. The denoised .npy promotes to R double on
-    # reticulate conversion; leaving the atlas in memory blows the SLURM budget.
-    meta_all <- obj@meta.data
-    atlas_cells <- colnames(obj)
-    rm(obj); gc()
-
-    log_msg("Loading scVI-denoised expression from ", SCVI_INPUT_DIR, " ...")
-    denoised <- reticulate::import("numpy")$load(
-      file.path(SCVI_INPUT_DIR, "denoised.npy"))
-    scvi_genes <- readLines(file.path(SCVI_INPUT_DIR, "genes.txt"))
-    scvi_cells <- read.delim(file.path(SCVI_INPUT_DIR, "cells.tsv"),
-                             stringsAsFactors = FALSE)
-    stopifnot(nrow(denoised) == nrow(scvi_cells))
-    stopifnot(ncol(denoised) == length(scvi_genes))
-
-    # denoised: cells × genes. Transpose to genes × cells.
-    denoised <- t(denoised)
-    rownames(denoised) <- scvi_genes
-    colnames(denoised) <- atlas_cells   # atlas col order matches export
-    log_msg("  scVI denoised: ", nrow(denoised), " genes × ", ncol(denoised), " cells")
-    gc()
-    meta_all <- meta_all[is_common_celltype(meta_all$cell_type), ]
-    log_msg("  Atlas cells in 25 common cell types: ", nrow(meta_all))
-
-    cts_in_meta <- unique(meta_all$cell_type)
-    log_msg("  Processing ", length(cts_in_meta), " cell types")
-
-    donor_ct_long <- list()
-    for (ct in cts_in_meta) {
-      t0 <- Sys.time()
-      cl_cells <- rownames(meta_all)[meta_all$cell_type == ct]
-      cl_meta <- meta_all[cl_cells, , drop = FALSE]
-      cl_expr <- denoised[, cl_cells, drop = FALSE]   # already in-memory
-
-      donor_ids <- cl_meta$donor_id
-      donors <- unique(donor_ids)
-      df <- data.frame(donor_id = donors,
-                       cell_type = ct, stringsAsFactors = FALSE)
-      for (h_name in names(hallmark_list)) {
-        fg <- intersect(hallmark_list[[h_name]], rownames(cl_expr))
-        if (length(fg) == 0) {
-          df[[h_name]] <- NA_real_
-        } else {
-          cell_score <- colMeans(cl_expr[fg, , drop = FALSE])
-          donor_mean <- tapply(cell_score, donor_ids, mean)
-          df[[h_name]] <- donor_mean[donors]
-        }
-      }
-      donor_ct_long[[ct]] <- df
-
-      rm(cl_expr); gc()
-      dt_sec <- round(as.numeric(Sys.time() - t0, units = "secs"), 1)
-      log_msg("    ", ct, ": ", length(donors), " donors, ", length(cl_cells),
-              " cells (", dt_sec, "s)")
-    }
-
-    rm(denoised); gc()
-
-    donor_ct_means <- do.call(rbind, donor_ct_long)
-    log_msg("  donor × cell_type rows: ", nrow(donor_ct_means))
-
-    long <- donor_ct_means %>%
-      pivot_longer(cols = all_of(names(hallmark_list)),
-                   names_to = "pathway", values_to = "score") %>%
-      mutate(feature = paste0(pathway, "__",
-                              gsub("[-/ ]", "_", cell_type)))
-    wide <- long %>%
-      select(donor_id, feature, score) %>%
-      pivot_wider(names_from = feature, values_from = score)
-    donor_ids_all <- wide$donor_id
-    X <- as.matrix(wide[, -1]); rownames(X) <- donor_ids_all
-
-    log_msg("  Pre-impute: ", nrow(X), " donors × ", ncol(X), " features")
-    log_msg("  NA count: ", sum(is.na(X)),
-            " (", round(100 * sum(is.na(X)) / length(X), 2), "%)")
-
-    donor_first <- meta_all[!duplicated(meta_all$donor_id),
-                            c("donor_id", "condition")]
-    rownames(donor_first) <- donor_first$donor_id
-    pheno <- data.frame(
-      donor_id = donor_ids_all,
-      condition = donor_first[donor_ids_all, "condition"],
-      stringsAsFactors = FALSE
-    )
-    rownames(pheno) <- donor_ids_all
-
-    fm <- list(X_raw = X, pheno = pheno,
-               feature_names = colnames(X),
-               hallmark_set_sizes = sapply(hallmark_list, length))
-    saveRDS(fm, FEATURE_MATRIX_PATH)
-    log_msg("  Saved: ", FEATURE_MATRIX_PATH)
-    skip_atlas_block <- TRUE
-  }
-
   # The block below is only for DENOISE_METHOD == "none" (Seurat AddModuleScore
-  # on raw log-normalised expression). The scvi path above writes its own
-  # feature matrix and short-circuits here.
+  # on raw log-normalised expression).
   if (DENOISE_METHOD == "none") {
   log_msg("AddModuleScore on 50 Hallmark sets (15-25 min)...")
   obj <- AddModuleScore(obj, features = hallmark_list,
