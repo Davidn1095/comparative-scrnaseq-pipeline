@@ -6,9 +6,7 @@ syndrome (SjS) and healthy donors.
 
 **This repository holds the analysis code only.** It contains no data, no
 results and no intermediate objects. All four datasets are public and are
-named below, but two sets of hand-prepared inputs are **not included**: the
-per-dataset sample sheets and the extracts from the Toro-Domínguez et al.
-(2014) supplementary files.
+named below.
 
 ## Datasets
 
