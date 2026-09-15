@@ -149,12 +149,12 @@ if (file.exists(FEATURE_MATRIX_PATH) && !force_features && !cache_stale) {
       hvg <- hvg[!grepl(EXCLUDED_GENE_REGEX, hvg)]
       hvg <- intersect(hvg, rownames(obj))
       log_msg("  Hallmark gene union: ", length(hvg),
-              " genes (post-MT/RPL/RPS/HB/sex-chromosome filter, intersected with atlas)")
+              " genes (post-EXCLUDED_GENE_REGEX filter, intersected with atlas)")
     } else {
       hvg <- Seurat::VariableFeatures(obj)
       hvg <- hvg[!grepl(EXCLUDED_GENE_REGEX, hvg)]
       hvg <- intersect(hvg, rownames(obj))
-      log_msg("  HVG set: ", length(hvg), " genes (post-MT/RPL/RPS/HB/sex-chromosome filter)")
+      log_msg("  HVG set: ", length(hvg), " genes (post-EXCLUDED_GENE_REGEX filter)")
     }
 
     # Pull log-normalised expression for the chosen gene pool once, keep sparse.

@@ -72,10 +72,12 @@ LFC_THRESH          <- get_env_numeric("LFC_THRESH", 1.0)
 # - MT-* : mitochondrial transcripts (technical / stress correlate)
 # - RPL*/RPS*: ribosomal protein genes (housekeeping noise)
 # - HB[ABDEGMQZ] : hemoglobin chains and pseudogenes (red blood cell contamination)
+# - SLC4A1, ALAS2, AHSP, CA1: further erythroid genes, the same red-cell contamination
+#   that the haemoglobin pattern misses (SLC4A1 was the largest SLE fold change)
 # - Y-chromosome + XIST/TSIX: sex-chromosome genes (confounded by cohort sex
 #   imbalance; CXG SLE has 9.3% male donors vs CXG HC 2.0% → drives spurious
 #   DDX3Y/EIF1AY upregulation in SLE that is not biology).
-EXCLUDED_GENE_REGEX <- "^MT-|^RPL|^RPS|^HB[ABDEGMQZ]|^(DDX3Y|EIF1AY|UTY|USP9Y|RPS4Y1|KDM5D|NLGN4Y|TMSB4Y|ZFY|TBL1Y|TXLNGY|PRKY|RPS4Y2|XIST|TSIX)$"
+EXCLUDED_GENE_REGEX <- "^MT-|^RPL|^RPS|^HB[ABDEGMQZ]|^(SLC4A1|ALAS2|AHSP|CA1)$|^(DDX3Y|EIF1AY|UTY|USP9Y|RPS4Y1|KDM5D|NLGN4Y|TMSB4Y|ZFY|TBL1Y|TXLNGY|PRKY|RPS4Y2|XIST|TSIX)$"
 TOP_N_GENES         <- get_env_integer("TOP_N_GENES", 50)
 MIN_DONORS          <- get_env_integer("MIN_DONORS", 8)
 MIN_CELLS           <- get_env_integer("MIN_CELLS", 100)

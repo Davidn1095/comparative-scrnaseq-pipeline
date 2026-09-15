@@ -260,7 +260,7 @@ log_msg("Wrote: shap_importance_per_pathway.tsv (", nrow(per_pw), " rows)")
 # types within each pathway. Long format, one row per (unit, class), rows in
 # the class-averaged order above. Averaging the three class rows of any unit
 # reproduces its class-averaged value. These feed Fig 4b-d (per-class stacked
-# bars, per-class heatmaps) and Supplementary Table 6. No per-class fold SDs
+# bars, per-class heatmaps) and Supplementary Table 7. No per-class fold SDs
 # are written: they are large by construction for the 14-donor SjS class and
 # are not reported anywhere.
 per_feat_class <- do.call(rbind, lapply(seq_along(classes), function(k) data.frame(
