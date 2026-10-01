@@ -527,19 +527,43 @@ build_fig1 <- function() {
           plot.margin = margin(12, 12, 12, 12)) +
     guides(color = guide_legend(override.aes = list(size = 2, alpha = 1), nrow = 1))
 
-  # ---- Panel D: UMAP by lineage (8 groups) + centroid labels ----
+  # ---- Panel D: UMAP by lineage (8 groups) + lineage labels ----
+  # Each label points at the densest part of its own lineage: the UMAP is binned
+  # on a 100 x 100 grid and, among the bins where the lineage has the most cells,
+  # the bin holding most of its cells is used. A median can fall where another
+  # lineage dominates (CD8 T cells are split between the CD4 T and the
+  # unconventional T regions).
+  nb <- 100
+  xr <- range(umap_df$UMAP_1); yr <- range(umap_df$UMAP_2)
   centroids <- umap_df %>%
+    mutate(bx = pmin(floor((UMAP_1 - xr[1]) / diff(xr) * nb), nb - 1),
+           by = pmin(floor((UMAP_2 - yr[1]) / diff(yr) * nb), nb - 1)) %>%
+    count(bx, by, lineage, name = "n") %>%
+    group_by(bx, by) %>%
+    filter(n == max(n)) %>%
     group_by(lineage) %>%
-    summarise(x = median(UMAP_1), y = median(UMAP_2), .groups = "drop")
+    slice_max(n, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    transmute(lineage,
+              x = xr[1] + (bx + 0.5) / nb * diff(xr),
+              y = yr[1] + (by + 0.5) / nb * diff(yr))
+  # A fixed sample of cells with empty labels repels the label text off the cells,
+  # so each label sits in empty space with a leader line to its anchor.
+  set.seed(42)
+  repel_pts <- umap_df[sample(nrow(umap_df), 4000), c("UMAP_1", "UMAP_2")]
+  label_df <- rbind(
+    data.frame(x = centroids$x, y = centroids$y, label = as.character(centroids$lineage)),
+    data.frame(x = repel_pts$UMAP_1, y = repel_pts$UMAP_2, label = "")
+  )
 
   panel_d <- ggplot(umap_df, aes(x = UMAP_1, y = UMAP_2, color = lineage)) +
     ggrastr::rasterise(geom_point(size = 0.2, alpha = 0.4, stroke = 0), dpi = 600) +
     ggrepel::geom_text_repel(
-      data = centroids, aes(x = x, y = y, label = lineage),
+      data = label_df, aes(x = x, y = y, label = label),
       size = 2.5, fontface = "bold", color = TEXT_COL,
       bg.color = "white", bg.r = 0.15,
-      box.padding = 0.4, point.padding = 0.2,
-      min.segment.length = 0.3, seed = 42, max.overlaps = 20,
+      box.padding = 0.3, point.padding = 0, point.size = 0.5,
+      min.segment.length = 0, seed = 42, max.overlaps = Inf, max.iter = 100000,
       inherit.aes = FALSE
     ) +
     scale_color_manual(values = fig1_lineage_colors, name = NULL) +
