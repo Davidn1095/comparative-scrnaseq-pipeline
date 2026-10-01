@@ -485,16 +485,13 @@ build_fig1 <- function() {
   set.seed(42)
   umap_df <- umap_df[sample(nrow(umap_df)), ]
 
-  # Dataset colour palette. The CXG identifier is kept in full (no shortening
-  # anywhere in the manuscript); it is broken over two lines for the legend.
-  dataset_labels <- setNames(
-    ifelse(grepl("^CXG_", umap_df$dataset_id),
-           sub("^(CXG_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-)", "\\1\n", umap_df$dataset_id),
-           umap_df$dataset_id),
-    umap_df$dataset_id
-  )
-  umap_df$dataset_label <- dataset_labels[umap_df$dataset_id]
-  datasets <- sort(unique(umap_df$dataset_label))
+  # Dataset colour palette. The CELLxGENE cohort is labelled by its publication
+  # (Table 1 gives its dataset ID); the GEO series keep their accessions. Colours
+  # and legend order follow the sorted dataset IDs, so the label does not move them.
+  ds_ids <- sort(unique(as.character(umap_df$dataset_id)))
+  dataset_labels <- setNames(ifelse(grepl("^CXG_436154da", ds_ids), "Perez 2022 (CELLxGENE)", ds_ids), ds_ids)
+  umap_df$dataset_label <- factor(dataset_labels[as.character(umap_df$dataset_id)], levels = unname(dataset_labels))
+  datasets <- unname(dataset_labels)
   n_ds <- length(datasets)
   dataset_colors <- setNames(scales::hue_pal()(n_ds), datasets)
 
@@ -781,7 +778,10 @@ build_fig2 <- function() {
         # Apply canonical ordering (panel-a/c match). Fall back to Jaccard-
         # descending if ct_order is unavailable for any reason.
         if (!is.null(ct_order)) {
+          # Cell types with no DEG in either disease are absent from ct_order and
+          # from panels a and c; drop them here too rather than plotting an NA level.
           sim_df$cell_type <- factor(sim_df$cell_type, levels = ct_order)
+          sim_df <- sim_df[!is.na(sim_df$cell_type), ]
           sim_df <- sim_df[order(sim_df$cell_type), ]
         } else {
           sim_df <- sim_df %>%
