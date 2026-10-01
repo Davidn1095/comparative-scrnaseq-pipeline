@@ -2,10 +2,9 @@
 
 Analysis code for a single-cell RNA-seq comparison of peripheral blood
 mononuclear cells (PBMCs) from systemic lupus erythematosus (SLE), Sjögren's
-disease (SjD) and healthy donors. The scripts keep the earlier abbreviation SjS
-(`SjS`, `sjs`) in variable, column, folder and file names.
+disease (SjD) and healthy donors.
 
-**This repository holds the analysis code only.** It contains no data, no
+This repository holds the analysis code only. It contains no data, no
 results and no intermediate objects. All four datasets are public and are
 named below.
 
