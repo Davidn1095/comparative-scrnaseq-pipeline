@@ -1,0 +1,183 @@
+# Dissociation-induced genes excluded from differential expression, GSEA and the classifier
+# gene pool, at the same stage as the mitochondrial, ribosomal and haemoglobin genes
+# (EXCLUDED_DISSOCIATION_GENES in scripts/00_config.R, which lists the exclude_names column).
+#
+# Source: van den Brink SC, Sage F, Vertesy A, Spanjaard B, Peterson-Maduro J, Baron CS,
+#   Robin C, van Oudenaarden A. Single-cell sequencing reveals dissociation-induced gene
+#   expression in tissue subpopulations. Nat Methods 14, 935-936 (2017). doi:10.1038/nmeth.4437.
+#   Supplementary Table 5, "List of genes of which expression levels were assumed to be
+#   affected by the dissociation procedure", in the Supplementary Text and Figures PDF
+#   (41592_2017_BFnmeth4437_MOESM1_ESM.pdf, md5 b7ffe5aaecdbd7fc211e84ba26b0516d): 140 mouse
+#   genes, which include all 32 genes of Supplementary Table 1.
+# Human orthologs: MGI mouse-human homology report HOM_MouseHumanSequence.rpt, downloaded
+#   2026-09-29 from https://www.informatics.jax.org/downloads/reports/ (md5
+#   52ded7aa493b5d9098a60635356bfae5). Mouse symbols renamed since 2017 were resolved with the
+#   MGI marker list MRK_List2.rpt (same date, md5 59f8602314eb67bea69bd36aeb95e9f8):
+#   Cyr61 -> Ccn1; Fam132b -> Erfe; Ccrn4l -> Noct.
+#   One-to-many mappings, all kept: Cxcl1 -> CXCL1, CXCL2, CXCL3; H3f3b -> H3-3B, H3-5; Mt1 ->
+#   MT1A, MT1B, MT1E, MT1F, MT1G, MT1H, MT1L, MT1M, MT1X; Rap1b -> RAP1B, RAP1BL; Hsp90aa1 ->
+#   HSP90AA1, HSP90AA4P; Mt2 -> MT1X, MT2A; Hsp90ab1 -> HSP90AB1, HSP90AB3P.
+#   154 human orthologs, 150 of them in the atlas; absent: HSP90AA4P, HSP90AB3P, MT1L, RAP1BL.
+#   Atlas features named by an older HGNC symbol (unambiguous previous symbols only), also
+#   excluded: CYR61 (CCN1), FAM132B (ERFE), H3F3B (H3-3B), H3F3C (H3-5).
+# Added: HSPA6, a stress-inducible human HSP70 with no mouse ortholog (not in the MGI
+#   homology report), so a mouse-derived list cannot contain it.
+#
+# Columns: human_symbol; mouse_symbol, the 2017 symbol in Supplementary Table 5;
+#   exclude_names, the names excluded (the human symbol and any atlas name for it).
+human_symbol	mouse_symbol	exclude_names
+ACTG1	Actg1	ACTG1
+ANKRD1	Ankrd1	ANKRD1
+ARID5A	Arid5a	ARID5A
+ATF3	Atf3	ATF3
+ATF4	Atf4	ATF4
+BAG3	Bag3	BAG3
+BHLHE40	Bhlhe40	BHLHE40
+BRD2	Brd2	BRD2
+BTG1	Btg1	BTG1
+BTG2	Btg2	BTG2
+CCN1	Cyr61	CCN1;CYR61
+CCNL1	Ccnl1	CCNL1
+CEBPB	Cebpb	CEBPB
+CEBPD	Cebpd	CEBPD
+CEBPG	Cebpg	CEBPG
+CSRNP1	Csrnp1	CSRNP1
+CXCL1	Cxcl1	CXCL1
+CXCL2	Cxcl1	CXCL2
+CXCL3	Cxcl1	CXCL3
+DCN	Dcn	DCN
+DDX3X	Ddx3x	DDX3X
+DDX5	Ddx5	DDX5
+DES	Des	DES
+DNAJA1	Dnaja1	DNAJA1
+DNAJB1	Dnajb1	DNAJB1
+DNAJB4	Dnajb4	DNAJB4
+DUSP1	Dusp1	DUSP1
+DUSP8	Dusp8	DUSP8
+EGR1	Egr1	EGR1
+EGR2	Egr2	EGR2
+EIF1	Eif1	EIF1
+EIF5	Eif5	EIF5
+ERF	Erf	ERF
+ERFE	Fam132b	ERFE;FAM132B
+ERRFI1	Errfi1	ERRFI1
+FOS	Fos	FOS
+FOSB	Fosb	FOSB
+FOSL2	Fosl2	FOSL2
+GADD45A	Gadd45a	GADD45A
+GADD45G	Gadd45g	GADD45G
+GCC1	Gcc1	GCC1
+GEM	Gem	GEM
+H3-3B	H3f3b	H3-3B;H3F3B
+H3-5	H3f3b	H3-5;H3F3C
+HIPK3	Hipk3	HIPK3
+HSP90AA1	Hsp90aa1	HSP90AA1
+HSP90AA4P	Hsp90aa1	HSP90AA4P
+HSP90AB1	Hsp90ab1	HSP90AB1
+HSP90AB3P	Hsp90ab1	HSP90AB3P
+HSPA1A	Hspa1a	HSPA1A
+HSPA1B	Hspa1b	HSPA1B
+HSPA5	Hspa5	HSPA5
+HSPA8	Hspa8	HSPA8
+HSPB1	Hspb1	HSPB1
+HSPE1	Hspe1	HSPE1
+HSPH1	Hsph1	HSPH1
+ID3	Id3	ID3
+IDI1	Idi1	IDI1
+IER2	Ier2	IER2
+IER3	Ier3	IER3
+IER5	Ier5	IER5
+IFRD1	Ifrd1	IFRD1
+IL6	Il6	IL6
+IRF1	Irf1	IRF1
+IRF8	Irf8	IRF8
+ITPKC	Itpkc	ITPKC
+JUN	Jun	JUN
+JUNB	Junb	JUNB
+JUND	Jund	JUND
+KCNE4	Kcne4	KCNE4
+KLF2	Klf2	KLF2
+KLF4	Klf4	KLF4
+KLF6	Klf6	KLF6
+KLF9	Klf9	KLF9
+LITAF	Litaf	LITAF
+LMNA	Lmna	LMNA
+MAFF	Maff	MAFF
+MAFK	Mafk	MAFK
+MCL1	Mcl1	MCL1
+MIDN	Midn	MIDN
+MIR22HG	Mir22hg	MIR22HG
+MT1A	Mt1	MT1A
+MT1B	Mt1	MT1B
+MT1E	Mt1	MT1E
+MT1F	Mt1	MT1F
+MT1G	Mt1	MT1G
+MT1H	Mt1	MT1H
+MT1L	Mt1	MT1L
+MT1M	Mt1	MT1M
+MT1X	Mt1;Mt2	MT1X
+MT2A	Mt2	MT2A
+MYADM	Myadm	MYADM
+MYC	Myc	MYC
+MYD88	Myd88	MYD88
+NCKAP5L	Nckap5l	NCKAP5L
+NCOA7	Ncoa7	NCOA7
+NFKBIA	Nfkbia	NFKBIA
+NFKBIZ	Nfkbiz	NFKBIZ
+NOCT	Ccrn4l	NOCT
+NOP58	Nop58	NOP58
+NPPC	Nppc	NPPC
+NR4A1	Nr4a1	NR4A1
+ODC1	Odc1	ODC1
+OSGIN1	Osgin1	OSGIN1
+OXNAD1	Oxnad1	OXNAD1
+PCF11	Pcf11	PCF11
+PDE4B	Pde4b	PDE4B
+PER1	Per1	PER1
+PHLDA1	Phlda1	PHLDA1
+PNP	Pnp	PNP
+PNRC1	Pnrc1	PNRC1
+PPP1CC	Ppp1cc	PPP1CC
+PPP1R15A	Ppp1r15a	PPP1R15A
+PXDC1	Pxdc1	PXDC1
+RAP1B	Rap1b	RAP1B
+RAP1BL	Rap1b	RAP1BL
+RASSF1	Rassf1	RASSF1
+RHOB	Rhob	RHOB
+RHOH	Rhoh	RHOH
+RIPK1	Ripk1	RIPK1
+SAT1	Sat1	SAT1
+SBNO2	Sbno2	SBNO2
+SDC4	Sdc4	SDC4
+SERPINE1	Serpine1	SERPINE1
+SKIL	Skil	SKIL
+SLC10A6	Slc10a6	SLC10A6
+SLC38A2	Slc38a2	SLC38A2
+SLC41A1	Slc41a1	SLC41A1
+SOCS3	Socs3	SOCS3
+SQSTM1	Sqstm1	SQSTM1
+SRF	Srf	SRF
+SRSF5	Srsf5	SRSF5
+SRSF7	Srsf7	SRSF7
+STAT3	Stat3	STAT3
+TAGLN2	Tagln2	TAGLN2
+TIPARP	Tiparp	TIPARP
+TNFAIP3	Tnfaip3	TNFAIP3
+TNFAIP6	Tnfaip6	TNFAIP6
+TPM3	Tpm3	TPM3
+TPPP3	Tppp3	TPPP3
+TRA2A	Tra2a	TRA2A
+TRA2B	Tra2b	TRA2B
+TRIB1	Trib1	TRIB1
+TUBB4B	Tubb4b	TUBB4B
+TUBB6	Tubb6	TUBB6
+UBC	Ubc	UBC
+USP2	Usp2	USP2
+WAC	Wac	WAC
+ZC3H12A	Zc3h12a	ZC3H12A
+ZFAND5	Zfand5	ZFAND5
+ZFP36	Zfp36	ZFP36
+ZFP36L1	Zfp36l1	ZFP36L1
+ZFP36L2	Zfp36l2	ZFP36L2
+ZYX	Zyx	ZYX
+HSPA6	-	HSPA6

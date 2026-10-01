@@ -3,15 +3,21 @@
 # 10_manuscript_figures.R - Compose figures for Manuscript 1
 #
 # Manuscript 1: Comparative single-cell transcriptomic landscape of SLE and SjS
-# Target journal: Nature Communications
+# Target journal: Journal of Autoimmunity (Elsevier)
 #
-# Manuscript figures (180 mm / 7.087 in double-column width):
-#   Figure 1: Atlas Overview              (build_fig1)
-#   Figure 2: Disease-Specific Programs   (build_fig2)
-#   Figure 3: Pathway Enrichment          (build_fig3)
-#   Figure 4: Donor-level Classification  (build_fig4)
+# Figures are drawn at final print size (190 mm wide, <= 240 mm tall, text
+# >= 7 pt). The builders keep their old four-figure numbering (--figure N);
+# the files carry the manuscript's numbering (six figures + Supplementary Figure 1):
+#   Figure 1: Analysis pipeline            (TikZ, manuscript/figures/fig1_pipeline.tex)
+#   Figure 2: Atlas overview               (build_fig1)
+#   Figure 3: Differential expression      (build_fig2)
+#   Figure 4: Pathway enrichment + sharing (build_fig3)
+#   Figure 5: Per-cell-type pathway heatmap (build_fig3)
+#   Figure 6: Donor-level classification   (build_fig4)
+#   Supplementary Figure 1: per-class SHAP heatmap (build_fig4)
 #
-# Output: results/manuscript1_figures/
+# Output: results/manuscript1_figures/, copied to manuscript/figures/ and, for
+# Supplementary Figure 1, manuscript/supplementary/ (FIG_FILES)
 ################################################################################
 
 # --- Load configuration ---
@@ -66,7 +72,12 @@ disease_colors <- c("SLE" = "#D55E00", "SjS" = "#0072B2")
 # --- Configuration ---
 ATLAS_OVERVIEW <- file.path(ATLAS_ROOT, "results", "plots", "atlas_overview")
 DIFFERENTIAL_EXPRESSION <- file.path(ATLAS_ROOT, "results", "plots", "differential_expression")
-OUTDIR <- file.path(ATLAS_ROOT, "results", "manuscript1_figures")
+# FIG_OUTDIR writes the figures somewhere else (e.g. a draft folder for review)
+# and skips the copy into manuscript/figures, so the current files are untouched.
+# Side tables always go to TABLE_DIR, never into a figure folder.
+TABLE_DIR <- file.path(ATLAS_ROOT, "results", "manuscript1_figures")
+OUTDIR <- Sys.getenv("FIG_OUTDIR", TABLE_DIR)
+DRAFT_OUTPUT <- nzchar(Sys.getenv("FIG_OUTDIR"))
 dir.create(OUTDIR, recursive = TRUE, showWarnings = FALSE)
 
 # Nature Communications figure specifications
@@ -74,11 +85,19 @@ dir.create(OUTDIR, recursive = TRUE, showWarnings = FALSE)
 # Text: 5-7 pt body, 8 pt bold lowercase panel labels
 # Font: Helvetica or Arial (sans-serif)
 # DPI: 300 min, 450 recommended
-FIG_WIDTH        <- 180 / 25.4   # 7.087 in (Nature double-column max)
+# Figures are drawn at their final print size (1:1), for Elsevier's double-column
+# width. Every text element is at least MIN_PT at that size; nothing is scaled later.
+FIG_WIDTH        <- 190 / 25.4   # 7.480 in (Elsevier double column)
+FIG_MAX_HEIGHT   <- 240 / 25.4   # tallest figure that fits a page
+MIN_PT           <- 7
+BLOCK_MM         <- 7            # depth of the coloured group blocks (Figs 5 and 7)
+FRAME_LWD        <- 1            # frame of the heatmaps and their blocks (grid lwd; 1 = 0.75 pt)
 FIG_WIDTH_SINGLE <- 88 / 25.4    # 3.465 in (Nature single-column)
 BASE_SIZE  <- 7                   # Nature max text size
 LABEL_SIZE <- 8                   # Nature panel label size
+TITLE_PT   <- 8                   # panel titles: bold, centred on the plotting area
 FONT_FAMILY <- "Helvetica"        # Nature required sans-serif
+TEXT_COL    <- "#000000"          # every text element: set in theme_nature() and the heatmap gpars
 
 # =============================================================================
 # Helper functions
@@ -128,10 +147,38 @@ img_to_grob <- function(img) {
   grid::textGrob("Cannot display image", gp = grid::gpar(col = "grey50"))
 }
 
+# ---- Display labels ----
+# The manuscript names the disease Sjogren's disease (SjD). Input files,
+# directories and internal keys keep "SjS"/"sjs" so every upstream output still
+# resolves; this one mapping rewrites text in each finished figure, at save time.
+DISPLAY_LABELS <- c(SjS = "SjD")
+# Group names as the figures show them: healthy controls are "HC" throughout.
+display_group <- function(x) ifelse(x == "Healthy", "HC", x)
+relabel_text <- function(x) {
+  for (k in names(DISPLAY_LABELS)) x <- gsub(k, DISPLAY_LABELS[[k]], x, fixed = TRUE)
+  x
+}
+# Walks a grob tree and relabels every text label: ggplot axes, legends, strips
+# and titles, geom_text, and the ComplexHeatmap grob grabbed for Fig 3b.
+relabel_grob <- function(g) {
+  if (is.character(g$label)) g$label <- relabel_text(g$label)
+  if (!is.null(g$grobs)) g$grobs <- lapply(g$grobs, relabel_grob)
+  if (length(g$children)) {
+    for (nm in names(g$children)) g$children[[nm]] <- relabel_grob(g$children[[nm]])
+  }
+  g
+}
+as_display_grob <- function(plot) {
+  g <- if (inherits(plot, "patchwork")) patchwork::patchworkGrob(plot)
+       else if (inherits(plot, "ggplot")) ggplotGrob(plot)
+       else plot
+  relabel_grob(g)
+}
+
 # Save figure as PDF (vector, Nature Communications preferred)
 save_nature_fig <- function(plot, outpath, width = FIG_WIDTH, height = 8) {
   pdf_path <- sub("\\.png$", ".pdf", outpath)
-  ggsave(pdf_path, plot, width = width, height = height,
+  ggsave(pdf_path, as_display_grob(plot), width = width, height = height,
          device = cairo_pdf, bg = "white")
   log_msg("  Saved: ", pdf_path)
 }
@@ -139,23 +186,67 @@ save_nature_fig <- function(plot, outpath, width = FIG_WIDTH, height = 8) {
 theme_nature <- function(base_size = BASE_SIZE, base_family = FONT_FAMILY) {
   theme_minimal(base_size = base_size, base_family = base_family) +
     theme(
-      text = element_text(family = base_family),
-      plot.title = element_text(size = base_size, face = "bold", hjust = 0.5),
-      plot.subtitle = element_text(size = base_size - 1, color = "grey40"),
-      axis.title = element_text(size = base_size),
-      axis.text = element_text(size = base_size - 1),
-      legend.title = element_text(size = base_size - 1),
-      legend.text = element_text(size = base_size - 1),
+      # theme_minimal() draws axis text grey30 and strip text grey10; all text is black
+      text = element_text(family = base_family, colour = TEXT_COL),
+      plot.title = element_text(size = base_size, face = "bold", hjust = 0.5, colour = TEXT_COL),
+      plot.subtitle = element_text(size = base_size, colour = TEXT_COL),
+      axis.title = element_text(size = base_size, colour = TEXT_COL),
+      axis.text = element_text(size = base_size, colour = TEXT_COL),
+      legend.title = element_text(size = base_size, colour = TEXT_COL),
+      legend.text = element_text(size = base_size, colour = TEXT_COL),
+      strip.text = element_text(colour = TEXT_COL),
       panel.grid.minor = element_blank(),
       panel.grid.major = element_line(color = "grey90", linewidth = 0.3),
       plot.margin = margin(2, 2, 2, 2)
     )
 }
 
+# Panel title, the same in every figure: TITLE_PT bold, centred on the panel's
+# plotting area, 4 pt above it (above any legend placed at the top). Added
+# last, so no later theme can restyle it.
+panel_title <- function(text) {
+  list(labs(title = text),
+       theme(plot.title = element_text(size = TITLE_PT, face = "bold", hjust = 0.5,
+                                       margin = margin(b = 4)),
+             plot.title.position = "panel"))
+}
+
 # ---- Figure 4 helpers and palette ----
 COND_COLOR   <- c(healthy = "#009E73", sle = "#D55E00", sjs = "#0072B2")
 COND_LABEL   <- c(healthy = "HC",      sle = "SLE",     sjs = "SjS")
 CLASS_FILL   <- setNames(unname(COND_COLOR), unname(COND_LABEL))  # fig 4 stacked bars
+
+# Colour each facet strip by its label (the SHAP heatmap's class blocks, drawn
+# like the SLE/SjS blocks of the pathway heatmap: filled, FRAME_LWD black frame,
+# white bold 8 pt label, BLOCK_MM deep, 1 mm from the panel). ggplot fills every
+# strip alike, so the fills and the strip width are set on the gtable. Each
+# strip is itself a gtable of fixed width, so its own width is set as well as
+# its column's, and strips are unclipped so the whole frame shows.
+class_strips <- function(p, fills, STRIP_MM = BLOCK_MM, GAP_MM = 1) {
+  g <- ggplotGrob(p)
+  labels_of <- function(x) c(if (is.character(x$label)) x$label,
+                             unlist(lapply(x$grobs, labels_of)),
+                             unlist(lapply(x$children, labels_of)))
+  refill <- function(x, fill) {
+    if (inherits(x, "rect")) x$gp$fill <- fill
+    if (!is.null(x$grobs)) x$grobs <- lapply(x$grobs, refill, fill = fill)
+    if (length(x$children)) {
+      for (nm in names(x$children)) x$children[[nm]] <- refill(x$children[[nm]], fill)
+    }
+    x
+  }
+  idx <- grep("^strip-r", g$layout$name)
+  for (i in idx) {
+    g$grobs[[i]] <- refill(g$grobs[[i]], fills[[labels_of(g$grobs[[i]])[1]]])
+    g$grobs[[i]]$widths <- unit(STRIP_MM, "mm")
+    g$grobs[[i]]$layout$clip <- "off"
+  }
+  g$layout$clip[idx] <- "off"
+  col <- unique(g$layout$l[idx])
+  stopifnot(length(col) == 1)
+  g$widths[col] <- unit(STRIP_MM, "mm")
+  gtable::gtable_add_cols(g, unit(GAP_MM, "mm"), pos = col - 1)
+}
 
 # ---- Bar convention ----
 # BAR_RADIUS is the corner radius of EVERY bar in the manuscript, stacked or
@@ -208,13 +299,13 @@ format_pathway_label <- function(x) {
 clean_path <- format_pathway_label
 
 # =============================================================================
-# Figure 1: Pipeline + Atlas Overview (6 panels, 4 rows)
-#   a: Pipeline overview (external PDF from TikZ/Overleaf)
-#   b: UMAP by dataset (accession)
-#   c: UMAP by condition (Healthy / SjS / SLE)
-#   d: UMAP by lineage (8 groups) + centroid labels
-#   e: Cell lineage composition by condition
-#   f: Per-donor cell-type composition (propeller bubbles)
+# Figure 2 (build_fig1): Atlas Overview (5 panels, 3 rows). The analysis
+# pipeline, Figure 1, is TikZ (manuscript/figures/fig1_pipeline.tex).
+#   a: UMAP by dataset (accession)
+#   b: UMAP by condition (Healthy / SjS / SLE)
+#   c: UMAP by lineage (8 groups) + centroid labels
+#   d: Cell lineage composition by condition
+#   e: Per-donor cell-type composition (propeller bubbles)
 # =============================================================================
 
 # Helper: bubble plot of per-cell-type differential abundance results.
@@ -284,12 +375,12 @@ build_composition_bubble <- function() {
     geom_point(data = d[d$significant, ],
                aes(size = neg_log10_fdr, fill = dominant),
                shape = 21, colour = "black", stroke = 0.3) +
-    scale_x_discrete(limits = ct_levels) +
+    scale_x_discrete(limits = ct_levels, labels = display_celltype) +
     scale_size_continuous(
-      name = expression(-log[10] * "(FDR)"),
+      name = "\u2212log10(FDR)",
       range = c(0.4, 3.5),
       breaks = c(2, 5, 10, 15),
-      labels = c("2", "5", "10", expression("" >= "15")),
+      labels = c("2", "5", "10", "\u2265 15"),
       limits = c(0, SIZE_CAP)
     ) +
     scale_fill_manual(
@@ -301,17 +392,18 @@ build_composition_bubble <- function() {
     labs(x = NULL, y = NULL) +
     theme_nature(base_size = 7) +
     theme(
-      axis.text.x = element_text(size = 6, angle = 45, hjust = 1, vjust = 1),
-      axis.text.y = element_text(size = 7, face = "bold"),
+      axis.text.x = element_text(size = MIN_PT, angle = 45, hjust = 1, vjust = 1),
+      axis.text.y = element_text(size = MIN_PT, face = "bold"),
       panel.grid.major.x = element_line(color = "grey95", linewidth = 0.2),
       panel.grid.major.y = element_blank(),
       legend.position = "right",
       legend.box = "vertical",
       legend.spacing.y = unit(1, "pt"),
-      legend.text = element_text(size = 5),
-      legend.title = element_text(size = 5),
+      legend.text = element_text(size = MIN_PT),
+      legend.title = element_text(size = MIN_PT, hjust = 0.5),
       legend.key.size = unit(0.2, "cm"),
-      plot.margin = margin(2, 2, 2, 10)
+      # 24 pt left: the first 45-degree label at 7 pt reaches past 10 pt
+      plot.margin = margin(2, 2, 2, 24)
     )
 }
 
@@ -408,33 +500,35 @@ build_fig1 <- function() {
 
   # ---- Panel B: UMAP by dataset ----
   panel_b <- ggplot(umap_df, aes(x = UMAP_1, y = UMAP_2, color = dataset_label)) +
-    ggrastr::rasterise(geom_point(size = 0.2, alpha = 0.4, stroke = 0), dpi = 300) +
+    ggrastr::rasterise(geom_point(size = 0.2, alpha = 0.4, stroke = 0), dpi = 600) +
     scale_color_manual(values = dataset_colors, name = "Dataset") +
     labs(x = "UMAP 1", y = "UMAP 2") +
     theme_nature() +
-    theme(legend.position = c(0.82, 0.15),
-          legend.background = element_rect(fill = alpha("white", 0.8), color = NA),
+    # Legend below the plot: at 7 pt it would cover cells inside the panel.
+    theme(legend.position = "bottom",
+          legend.title.position = "top",
           legend.key.size = unit(0.25, "cm"),
-          legend.text = element_text(size = 5),
-          legend.title = element_text(size = 6),
-          axis.text = element_text(size = 7),
+          legend.margin = margin(0, 0, 0, 0),
+          legend.text = element_text(size = MIN_PT),
+          legend.title = element_text(size = MIN_PT, hjust = 0.5),
+          axis.text = element_text(size = MIN_PT),
           plot.margin = margin(12, 12, 12, 12)) +
     guides(color = guide_legend(override.aes = list(size = 2, alpha = 1),
-                                ncol = 1))
+                                ncol = 2))
 
   # ---- Panel C: UMAP by condition ----
   panel_c <- ggplot(umap_df, aes(x = UMAP_1, y = UMAP_2, color = condition)) +
-    ggrastr::rasterise(geom_point(size = 0.2, alpha = 0.4, stroke = 0), dpi = 300) +
-    scale_color_manual(values = CONDITION_COLORS, name = NULL) +
+    ggrastr::rasterise(geom_point(size = 0.2, alpha = 0.4, stroke = 0), dpi = 600) +
+    scale_color_manual(values = CONDITION_COLORS, name = NULL, labels = display_group) +
     labs(x = "UMAP 1", y = "UMAP 2") +
     theme_nature() +
-    theme(legend.position = c(0.82, 0.15),
-          legend.background = element_rect(fill = alpha("white", 0.8), color = NA),
+    theme(legend.position = "bottom",
           legend.key.size = unit(0.25, "cm"),
-          legend.text = element_text(size = 7),
-          axis.text = element_text(size = 7),
+          legend.margin = margin(0, 0, 0, 0),
+          legend.text = element_text(size = MIN_PT),
+          axis.text = element_text(size = MIN_PT),
           plot.margin = margin(12, 12, 12, 12)) +
-    guides(color = guide_legend(override.aes = list(size = 2, alpha = 1)))
+    guides(color = guide_legend(override.aes = list(size = 2, alpha = 1), nrow = 1))
 
   # ---- Panel D: UMAP by lineage (8 groups) + centroid labels ----
   centroids <- umap_df %>%
@@ -442,10 +536,10 @@ build_fig1 <- function() {
     summarise(x = median(UMAP_1), y = median(UMAP_2), .groups = "drop")
 
   panel_d <- ggplot(umap_df, aes(x = UMAP_1, y = UMAP_2, color = lineage)) +
-    ggrastr::rasterise(geom_point(size = 0.2, alpha = 0.4, stroke = 0), dpi = 300) +
+    ggrastr::rasterise(geom_point(size = 0.2, alpha = 0.4, stroke = 0), dpi = 600) +
     ggrepel::geom_text_repel(
       data = centroids, aes(x = x, y = y, label = lineage),
-      size = 2.5, fontface = "bold", color = "grey20",
+      size = 2.5, fontface = "bold", color = TEXT_COL,
       bg.color = "white", bg.r = 0.15,
       box.padding = 0.4, point.padding = 0.2,
       min.segment.length = 0.3, seed = 42, max.overlaps = 20,
@@ -455,7 +549,7 @@ build_fig1 <- function() {
     labs(x = "UMAP 1", y = "UMAP 2") +
     theme_nature() +
     theme(legend.position = "none",
-          axis.text = element_text(size = 7),
+          axis.text = element_text(size = MIN_PT),
           plot.margin = margin(12, 12, 12, 12))
 
   # ---- Panel E: Composition by condition (8 lineage groups) ----
@@ -470,6 +564,7 @@ build_fig1 <- function() {
 
   comp_tot <- aggregate(pct ~ condition, comp_df, sum)
   panel_e <- ggplot(comp_df, aes(x = condition, y = pct)) +
+    scale_x_discrete(labels = display_group) +
     geom_col(aes(fill = lineage), width = 0.7, color = NA,
              position = position_stack(reverse = TRUE)) +
     stack_outline(comp_tot, "condition", "pct", width = 0.7, size = 0.3) +
@@ -481,8 +576,8 @@ build_fig1 <- function() {
     theme(legend.position = "bottom",
           legend.background = element_blank(),
           legend.key.size = unit(0.3, "cm"),
-          legend.text = element_text(size = 6),
-          axis.text = element_text(size = 7),
+          legend.text = element_text(size = MIN_PT),
+          axis.text = element_text(size = MIN_PT),
           plot.margin = margin(12, 12, 12, 12)) +
     guides(fill = guide_legend(nrow = 2, reverse = TRUE,
                                override.aes = list(color = NA)))
@@ -490,36 +585,40 @@ build_fig1 <- function() {
   # ---- Panel F: per-donor cell-type composition (propeller bubbles) ----
   panel_f <- build_composition_bubble()
 
-  # ---- Compose: 3 rows (b+c / d+e / f) — panel a is pipeline PDF, merged after
+  panel_b <- panel_b + panel_title("Cells by dataset")
+  panel_c <- panel_c + panel_title("Cells by disease group")
+  panel_d <- panel_d + panel_title("Cells by immune lineage")
+  panel_e <- panel_e + panel_title("Lineage composition")
+  panel_f <- panel_f + panel_title("Cell-type composition shifts")
+
+  # ---- Compose: 3 rows (b+c / d+e / f), lettered a-e as a standalone figure.
+  # The pipeline schematic is a figure of its own (fig_pipeline.tex).
+  # align = "h": both UMAPs keep the same panel size although their legends
+  # below differ in height
   row1 <- cowplot::plot_grid(
     panel_b, panel_c,
-    ncol = 2,
-    labels = c("b", "c"), label_size = LABEL_SIZE, label_fontface = "bold"
+    ncol = 2, align = "h", axis = "tb",
+    labels = c("a", "b"), label_size = LABEL_SIZE, label_fontface = "bold"
   )
   row2 <- cowplot::plot_grid(
     panel_d, panel_e,
     ncol = 2, rel_widths = c(1, 1),
-    labels = c("d", "e"), label_size = LABEL_SIZE, label_fontface = "bold"
+    labels = c("c", "d"), label_size = LABEL_SIZE, label_fontface = "bold"
   )
   row3 <- cowplot::plot_grid(
     panel_f,
     ncol = 1,
-    labels = c("f"), label_size = LABEL_SIZE, label_fontface = "bold"
+    labels = c("e"), label_size = LABEL_SIZE, label_fontface = "bold"
   )
+  # Rows of 71 mm plus 4 mm for the panel titles; the first gains 12 mm for
+  # the legends below the UMAPs.
   fig <- cowplot::plot_grid(
     row1, row2, row3,
-    ncol = 1, rel_heights = c(1, 1, 1)
+    ncol = 1, rel_heights = c(87, 75, 75)
   )
 
-  panels_pdf <- file.path(OUTDIR, "M1_Figure1_panels_bcef.pdf")
-  save_nature_fig(fig, panels_pdf, width = FIG_WIDTH, height = 8.0)
-
-  # Final Figure 1 is assembled by fig1_combined.tex (pipeline TikZ + this PDF)
-  combined_pdf <- file.path(OUTDIR, "M1_Figure1_atlas_overview.pdf")
-  if (!file.exists(combined_pdf)) {
-    file.copy(panels_pdf, combined_pdf, overwrite = TRUE)
-    log_msg("  WARNING: pipeline PDF not found, panels only → ", combined_pdf)
-  }
+  save_nature_fig(fig, file.path(OUTDIR, "fig2_atlas.pdf"),
+                  width = FIG_WIDTH, height = (87 + 75 + 75) / 25.4)
 
   # Free memory
   rm(atlas, umap_df, comp_df)
@@ -527,10 +626,10 @@ build_fig1 <- function() {
 }
 
 # =============================================================================
-# Figure 2: Disease-Specific Programs (3 panels)
+# Figure 3 (build_fig2): Disease-Specific Programs (2 panels)
 #   a: DEG counts barplot (per cell type, split by disease and direction)
-#   b: Shared vs disease-specific DEGs stacked bar
-#   c: Jaccard similarity (SLE vs SjS DEG overlap per cell type)
+#   b: Shared vs disease-specific DEGs stacked bar, over the Jaccard similarity
+#      (SLE vs SjS DEG overlap per cell type)
 # =============================================================================
 
 build_fig2 <- function() {
@@ -601,6 +700,7 @@ build_fig2 <- function() {
       # Vertical diverging barplot: cell types on x-axis
       panel_a <- ggplot(deg_counts, aes(x = cell_type, y = n_plot, fill = fill_group,
                                          group = disease)) +
+        scale_x_discrete(labels = display_celltype) +
         ggchicklet::geom_chicklet(position = position_dodge(width = 1.0, preserve = "single"),
                                   color = "black", size = 0.15, width = 0.95,
                                   radius = BAR_RADIUS) +
@@ -617,19 +717,19 @@ build_fig2 <- function() {
           labels = function(y) abs(y),
           expand = expansion(mult = c(0.02, 0.02))
         ) +
-        annotate("text", x = 0.5, y = x_max * 0.85, label = "Up",
-                 hjust = 0, size = 2.5, fontface = "bold") +
-        annotate("text", x = 0.5, y = -x_max * 0.85, label = "Down",
-                 hjust = 0, size = 2.5, fontface = "bold") +
-        labs(x = NULL, y = "Number of DEGs",
-             title = "DEG Counts") +
+        annotate("text", x = Inf, y = x_max * 0.85, label = "Up",
+                 hjust = 1.2, size = MIN_PT / .pt, fontface = "bold") +
+        annotate("text", x = Inf, y = -x_max * 0.85, label = "Down",
+                 hjust = 1.2, size = MIN_PT / .pt, fontface = "bold") +
+        labs(x = NULL, y = "Number of DEGs") +
         theme_nature(base_size = 8) +
         theme(
-          axis.text.x  = element_text(size = 5, angle = 45, hjust = 1),
-          plot.margin  = margin(5, 5, 5, 30),
+          axis.text.x  = element_text(size = MIN_PT, angle = 45, hjust = 1),
+          axis.text.y  = element_text(size = MIN_PT),
+          plot.margin  = margin(5, 5, 5, 28),
           legend.position = "top",
           legend.justification = "right",
-          legend.text = element_text(size = 6),
+          legend.text = element_text(size = MIN_PT),
           legend.key.size = unit(0.3, "cm"),
           legend.margin = margin(0, 0, 0, 0),
           panel.grid.major.x = element_blank()
@@ -690,6 +790,7 @@ build_fig2 <- function() {
         }
 
         panel_b <- ggplot(sim_df, aes(x = cell_type, y = jaccard)) +
+          scale_x_discrete(labels = display_celltype) +
           ggchicklet::geom_chicklet(fill = "#009E73", color = "black", size = 0.3,
                                     radius = BAR_RADIUS) +
           scale_y_continuous(limits = c(0, max(sim_df$jaccard) * 1.05),
@@ -697,8 +798,9 @@ build_fig2 <- function() {
           labs(y = "Jaccard similarity", x = NULL) +
           theme_nature(base_size = 8) +
           theme(
-            axis.text.x = element_text(size = 5, angle = 45, hjust = 1),
-            plot.margin = margin(5, 5, 5, 30),
+            axis.text.x = element_text(size = MIN_PT, angle = 45, hjust = 1),
+            axis.text.y = element_text(size = MIN_PT),
+            plot.margin = margin(5, 5, 5, 28),
             panel.grid.major.x = element_blank()
           )
       }
@@ -735,13 +837,13 @@ build_fig2 <- function() {
 
     full_de <- rbind(load_de_full("sle"), load_de_full("sjs")) %>%
       filter(!is.na(padj), padj < 0.05, abs(log2FoldChange) >= 1.0,
-             !grepl(EXCLUDED_GENE_REGEX, gene, ignore.case = TRUE)) %>%
+             !is_excluded_gene(gene)) %>%
       mutate(cell_type = gsub("_", " ", cell_type),
              direction = ifelse(log2FoldChange > 0, "up", "down"))
 
     # Supplementary table: full DEG counts per cell type x disease x direction
     # (no top-N cap; same filters as panel c — padj<0.05, |log2FC|>=1.0,
-    # MT/RPL/RPS/HB genes excluded).
+    # is_excluded_gene() genes removed).
     deg_table <- full_de %>%
       group_by(cell_type, disease, direction) %>%
       summarise(n = n(), .groups = "drop") %>%
@@ -757,7 +859,7 @@ build_fig2 <- function() {
              SjS_Up = SJS_up, SjS_Down = SJS_down, SjS_Total = SJS_Total,
              Total) %>%
       arrange(desc(Total))
-    deg_table_path <- file.path(OUTDIR, "SupplementaryTable_DEG_counts.tsv")
+    deg_table_path <- file.path(TABLE_DIR, "SupplementaryTable_DEG_counts.tsv")
     write.table(deg_table, deg_table_path,
                 sep = "\t", quote = FALSE, row.names = FALSE)
     log_msg("  Supplementary DEG counts written to: ", deg_table_path)
@@ -808,7 +910,7 @@ build_fig2 <- function() {
     # included as a fourth category for visual + categorical consistency with
     # Fig 3c, even though counts are universally small (n=4 total across all
     # cell types). Per-cell-type breakdown is also written to a side TSV.
-    discordant_tsv <- file.path(OUTDIR, "M1_Figure2_discordant_counts.tsv")
+    discordant_tsv <- file.path(TABLE_DIR, "M1_Figure2_discordant_counts.tsv")
     write.table(
       deg_counts_c[, c("cell_type", "Discordant")],
       discordant_tsv, sep = "\t", quote = FALSE, row.names = FALSE)
@@ -834,16 +936,16 @@ build_fig2 <- function() {
       stack_outline(deg_tot_c, "cell_type", "count", width = 0.9, size = 0.2) +
       scale_fill_manual(values = cat_colors_c, name = NULL) +
       scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
-      labs(y = "Number of DEGs", x = NULL,
-           title = "Shared vs Specific DEGs") +
+      labs(y = "Number of DEGs", x = NULL) +
       theme_nature(base_size = 8) +
       theme(
         axis.text.x  = element_blank(),
         axis.ticks.x = element_blank(),
-        plot.margin  = margin(5, 5, 0, 30),
+        axis.text.y  = element_text(size = MIN_PT),
+        plot.margin  = margin(5, 5, 0, 28),
         legend.position = "top",
         legend.justification = "right",
-        legend.text = element_text(size = 6),
+        legend.text = element_text(size = MIN_PT),
         legend.key.size = unit(0.25, "cm"),
         legend.margin = margin(0, 0, 0, 0),
         panel.grid.major.x = element_blank()
@@ -856,6 +958,9 @@ build_fig2 <- function() {
     panel_c <- ggplot() + theme_void() +
       annotate("text", x = 0.5, y = 0.5, label = "Signature data not found")
   }
+
+  panel_a <- panel_a + panel_title("DEG counts")
+  panel_c <- panel_c + panel_title("Shared vs specific DEGs")
 
   # ---- Compose: panel a (standalone with its own X axis) +
   #               b/c stacked sub-figure with shared X axis ----
@@ -877,15 +982,16 @@ build_fig2 <- function() {
     label_fontface = "bold"
   )
 
-  outpath <- file.path(OUTDIR, "M1_Figure2_disease_programs.pdf")
-  save_nature_fig(fig, outpath, width = FIG_WIDTH, height = 6.69)
+  outpath <- file.path(OUTDIR, "fig3_disease_programs.pdf")
+  save_nature_fig(fig, outpath, width = FIG_WIDTH, height = 185 / 25.4)
 }
 
 
 # =============================================================================
-# Figure 4: Pathway-level Shared vs Distinct Programs
-#   - Divergent plots (common + disease-specific pathways)
-#   - Heatmap of pathways x cell types
+# Figures 4 and 5 (build_fig3): Hallmark pathway enrichment
+#   Fig 4a: mean NES per pathway and disease (bubble plot)
+#   Fig 4b: per-cell-type pathway sharing categories, over the Jaccard similarity
+#   Fig 5:  NES heatmap, pathways x cell types, SLE and SjS blocks side by side
 # =============================================================================
 
 
@@ -905,12 +1011,17 @@ ct_lineage_order <- function(cts) {
   cts[order(lineage, cts)]
 }
 
-# Helper: combined SLE/SjS heatmap with hierarchical pathway clustering
+# Helper: combined SLE/SjS heatmap, the two disease blocks side by side and
+# sharing the pathway rows. (SLE above SjS needs 100 label rows, which do not
+# fit one page at 7 pt.) Returns the grob and its size in mm: the body is sized
+# absolutely (ROW_MM per pathway row, columns filling FIG_WIDTH), so the page is
+# exactly as large as the heatmap, its labels, title and legend.
 # gsea_norm: normalised long-form GSEA data
 # pathways: character vector of pathways to include (rows)
 # excluded_cts: cell types to drop (rare types failing thresholds)
+FIG5_ROT <- 45   # cell-type labels, 45 degrees as in the other figures
 build_combined_pathway_heatmap <- function(gsea_norm, pathways, excluded_cts,
-                                            ct_order = NULL) {
+                                            ct_order = NULL, ROW_MM = 2.5) {
   cts <- setdiff(unique(gsea_norm$cell_type), excluded_cts)
   if (is.null(ct_order)) {
     ct_order <- ct_lineage_order(cts)
@@ -939,57 +1050,87 @@ build_combined_pathway_heatmap <- function(gsea_norm, pathways, excluded_cts,
   mat_sle <- mat_sle[pathways, , drop = FALSE]
   mat_sjs <- mat_sjs[pathways, , drop = FALSE]
 
-  rownames(mat_sle) <- paste0("SLE__", rownames(mat_sle))
-  rownames(mat_sjs) <- paste0("SjS__", rownames(mat_sjs))
-  mat <- rbind(mat_sle, mat_sjs)
-  disease_split <- factor(c(rep("SLE", nrow(mat_sle)), rep("SjS", nrow(mat_sjs))),
+  colnames(mat_sle) <- paste0("SLE__", colnames(mat_sle))
+  colnames(mat_sjs) <- paste0("SjS__", colnames(mat_sjs))
+  mat <- cbind(mat_sle, mat_sjs)
+  disease_split <- factor(c(rep("SLE", ncol(mat_sle)), rep("SjS", ncol(mat_sjs))),
                           levels = c("SLE", "SjS"))
-  row_labels <- gsub("^(SLE|SjS)__", "", rownames(mat))
+  col_labels <- gsub("^(SLE|SjS)__", "", colnames(mat))
 
   finite_vals <- mat[is.finite(mat)]
   max_abs <- if (length(finite_vals) > 0) min(max(abs(finite_vals)), 4.0) else 4.0
   col_fun <- circlize::colorRamp2(c(-max_abs, 0, max_abs),
                                    c("#2166AC", "white", "#B2182B"))
 
-  ha_right <- rowAnnotation(
+  ha_top <- HeatmapAnnotation(
     Disease = anno_block(
-      gp = gpar(fill = disease_colors[c("SLE", "SjS")]),
+      gp = gpar(fill = disease_colors[c("SLE", "SjS")], col = "black", lwd = FRAME_LWD),
       labels = c("SLE", "SjS"),
-      labels_gp = gpar(col = "white", fontsize = 8, fontface = "bold")
+      labels_gp = gpar(col = "white", fontsize = 8, fontface = "bold"),
+      height = unit(BLOCK_MM, "mm")
     ),
     show_annotation_name = FALSE, show_legend = FALSE
   )
 
-  ht <- Heatmap(mat, name = "NES", col = col_fun,
+  # Absolute sizes. The legend sits below the body so the columns get the
+  # full width left of the row labels.
+  PAD_MM <- c(2, 2, 2, 2)                                   # bottom, left, top, right
+  GAP_MM <- 3
+  label_gp <- gpar(fontsize = MIN_PT, fontfamily = FONT_FAMILY, col = TEXT_COL)
+  rn_mm <- convertWidth(max_text_width(pathways, gp = label_gp), "mm", valueOnly = TRUE)
+  body_w_mm <- FIG_WIDTH * 25.4 - PAD_MM[2] - PAD_MM[4] - rn_mm -
+    ht_opt("DIMNAME_PADDING") %>% convertWidth("mm", valueOnly = TRUE) - GAP_MM
+
+  make_ht <- function(body_w_mm) Heatmap(mat, name = "NES", col = col_fun,
                 na_col = "white",
                 rect_gp = gpar(col = "white", lwd = 0.3),
                 border = TRUE,
-                right_annotation = ha_right,
-                row_split = disease_split,
+                border_gp = gpar(col = "black", lwd = FRAME_LWD),
+                top_annotation = ha_top,
+                column_split = disease_split,
+                # one title over both blocks, centred on them
                 column_title = "Per-cell-type pathway enrichment",
-                column_title_gp = gpar(fontsize = 9, fontface = "bold"),
-                row_title = NULL,
+                column_title_gp = gpar(fontsize = TITLE_PT, fontface = "bold", col = TEXT_COL),
+                column_gap = unit(GAP_MM, "mm"),
                 cluster_rows = FALSE, cluster_columns = FALSE,
                 show_row_names = TRUE, show_column_names = TRUE,
                 row_names_side = "left", column_names_side = "bottom",
-                column_names_rot = 45,
-                row_names_gp = gpar(fontsize = 5),
-                column_names_gp = gpar(fontsize = 6),
-                row_labels = row_labels,
-                row_gap = unit(3, "mm"),
-                heatmap_legend_param = list(title_gp = gpar(fontsize = 7),
-                                            labels_gp = gpar(fontsize = 6),
-                                            legend_height = unit(2.5, "cm")))
+                column_names_rot = FIG5_ROT,
+                row_names_gp = label_gp,
+                column_names_gp = label_gp,
+                row_labels = pathways,
+                column_labels = display_celltype(col_labels),
+                width = unit(body_w_mm, "mm"),
+                height = unit(length(pathways) * ROW_MM, "mm"),
+                heatmap_legend_param = list(title_gp = gpar(fontsize = MIN_PT, col = TEXT_COL),
+                                            labels_gp = gpar(fontsize = MIN_PT, col = TEXT_COL),
+                                            direction = "horizontal",
+                                            title_position = "topcenter",
+                                            legend_width = unit(2.5, "cm")))
 
-  grid.grabExpr(draw(ht, heatmap_legend_side = "right",
-                     padding = unit(c(4, 6, 2, 2), "mm")))
+  draw_args <- list(heatmap_legend_side = "bottom",
+                    align_heatmap_legend = "heatmap_center",   # centred under the blocks
+                    padding = unit(PAD_MM, "mm"))
+  # The first estimate misses some internal padding: measure the drawn width
+  # and take the excess off the body so the page is exactly FIG_WIDTH.
+  ht <- make_ht(body_w_mm)
+  drawn <- do.call(draw, c(list(ht), draw_args))
+  w_mm <- convertWidth(ComplexHeatmap:::width(drawn), "mm", valueOnly = TRUE)
+  ht <- make_ht(body_w_mm - (w_mm - FIG_WIDTH * 25.4))
+  drawn <- do.call(draw, c(list(ht), draw_args))
+  w_mm <- convertWidth(ComplexHeatmap:::width(drawn), "mm", valueOnly = TRUE)
+  h_mm <- convertHeight(ComplexHeatmap:::height(drawn), "mm", valueOnly = TRUE)
+  grob <- grid.grabExpr(do.call(draw, c(list(ht), draw_args)),
+                        width = w_mm / 25.4, height = h_mm / 25.4)
+  list(grob = grob, width_mm = w_mm, height_mm = h_mm)
 }
 
 build_fig3 <- function() {
   log_msg("--- M1 Figure 3: Pathway-level Shared vs Distinct ---")
 
   panel_a <- NULL
-  heatmap_grob <- NULL
+  heatmap_fig <- NULL
+  panel_c <- NULL
 
   gsea_file <- file.path(DIFFERENTIAL_EXPRESSION, "gsea_all_results.tsv")
   if (file.exists(gsea_file)) {
@@ -1104,25 +1245,26 @@ build_fig3 <- function() {
                               limits = c(0, NA),
                               breaks = c(0, 5, 15, 25),
                               name = "Sig. cell types") +
-        labs(x = NULL, y = "Mean NES",
-             title = "Hallmark pathway enrichment") +
+        labs(x = NULL, y = "Mean NES") +
         theme_nature(base_size = 8) +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 5),
-              plot.title = element_text(size = 9, face = "bold"),
-              plot.margin = margin(t = 4, r = 4, b = 4, l = 12, unit = "mm"),
-              legend.position = "right",
-              legend.box = "vertical",
-              legend.text = element_text(size = 6),
-              legend.title = element_text(size = 7),
+        # Legend below and a 1 mm right margin give the 50 labels the full
+        # width; the left margin holds the first 45-degree label's overhang.
+        theme(axis.text.x = element_text(angle = 45, hjust = 1, size = MIN_PT),
+              plot.margin = margin(t = 2, r = 1, b = 2, l = 13, unit = "mm"),
+              legend.position = "bottom",
+              legend.box = "horizontal",
+              legend.title.position = "top",
+              legend.text = element_text(size = MIN_PT),
+              legend.title = element_text(size = 7, hjust = 0.5),
               legend.key.size = unit(0.3, "cm"))
 
-      # --- Panel B (combined heatmap): Hallmark pathways significant in at
-      # least one cell type / disease, ordered by total absolute NES
-      # (|mean_NES_SLE| + |mean_NES_SjS|) descending — identical to panel a's
-      # x-axis. SLE on top, SjS on bottom; same row and column order in both.
-      # Non-significant cells (padj >= 0.05) shown white. Pathways universally
-      # non-significant in both diseases (4 of 50: bile acid metabolism, notch,
-      # hedgehog, spermatogenesis) are dropped to match panel a's inclusion.
+      panel_a <- panel_a + panel_title("Hallmark pathway enrichment")
+
+      # --- Heatmap (Fig 5): Hallmark pathways significant in at least one cell
+      # type / disease, ordered by total absolute NES (|mean_NES_SLE| +
+      # |mean_NES_SjS|) descending, identical to panel a's x-axis. SLE and SjS
+      # blocks side by side sharing the rows. Non-significant cells
+      # (padj >= 0.05) shown white.
       all_hallmarks_ordered <- pathway_levels
 
       # Cell-type order: shared with Fig 2 panel A (DEG count descending,
@@ -1144,7 +1286,7 @@ build_fig3 <- function() {
           pull(cell_type)
       }
 
-      heatmap_grob <- build_combined_pathway_heatmap(
+      heatmap_fig <- build_combined_pathway_heatmap(
         gsea_norm, all_hallmarks_ordered, excluded_cts,
         ct_order = ct_order_fig2)
 
@@ -1198,8 +1340,7 @@ build_fig3 <- function() {
         stack_outline(ct_tot, "cell_type", "count", width = 0.9, size = 0.2) +
         scale_fill_manual(values = cat_colors_pw, name = NULL) +
         scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
-        labs(y = "Number of pathways", x = NULL,
-             title = "Shared vs Specific Pathways") +
+        labs(y = "Number of pathways", x = NULL) +
         theme_nature(base_size = 8) +
         theme(
           axis.text.x  = element_blank(),
@@ -1207,13 +1348,16 @@ build_fig3 <- function() {
           plot.margin  = margin(5, 5, 0, 30),
           legend.position = "top",
           legend.justification = "right",
-          legend.text = element_text(size = 6),
+          legend.text = element_text(size = MIN_PT),
           legend.key.size = unit(0.25, "cm"),
           legend.margin = margin(0, 0, 0, 0),
           panel.grid.major.x = element_blank()
         )
 
+      panel_c_top <- panel_c_top + panel_title("Shared vs specific pathways")
+
       panel_c_bot <- ggplot(ct_counts, aes(x = cell_type, y = jaccard)) +
+        scale_x_discrete(labels = display_celltype) +
         ggchicklet::geom_chicklet(fill = "#009E73", color = "black", size = 0.3,
                                    radius = BAR_RADIUS) +
         scale_y_continuous(limits = c(0, max(ct_counts$jaccard) * 1.05),
@@ -1221,7 +1365,7 @@ build_fig3 <- function() {
         labs(y = "Jaccard similarity", x = NULL) +
         theme_nature(base_size = 8) +
         theme(
-          axis.text.x = element_text(size = 5, angle = 45, hjust = 1),
+          axis.text.x = element_text(size = MIN_PT, angle = 45, hjust = 1),
           plot.margin = margin(5, 5, 5, 30),
           panel.grid.major.x = element_blank()
         )
@@ -1234,38 +1378,38 @@ build_fig3 <- function() {
     })
   }
 
-  # Fallbacks
-  if (is.null(panel_a)) panel_a <- ggplot() + theme_void() + annotate("text", x = 0.5, y = 0.5, label = "No pathway data")
-  if (is.null(heatmap_grob)) heatmap_grob <- grid::textGrob("Pathway heatmap\nnot available", gp = grid::gpar(col = "grey50"))
-  if (!exists("panel_c") || is.null(panel_c)) panel_c <- ggplot() + theme_void() +
-    annotate("text", x = 0.5, y = 0.5, label = "Panel c not available")
+  if (is.null(panel_a) || is.null(heatmap_fig) || is.null(panel_c)) {
+    stop("Pathway figures not built; see the warning above.")
+  }
 
-  # Compose: 3 rows (a = bubble plot, b = combined SLE/SjS heatmap, c = pathway
-  # sharing + Jaccard mirroring Fig 2 panel b structure)
+  # Fig 4: bubble plot (a) over pathway sharing + Jaccard (b), the original
+  # rows 1 and 3. The heatmap (original row 2) is Fig 5.
   row1 <- cowplot::plot_grid(panel_a, labels = "a",
                               label_size = LABEL_SIZE, label_fontface = "bold")
-  row2 <- cowplot::plot_grid(heatmap_grob, labels = "b",
+  row2 <- cowplot::plot_grid(panel_c, labels = "b",
                               label_size = LABEL_SIZE, label_fontface = "bold")
-  row3 <- cowplot::plot_grid(panel_c, labels = "c",
-                              label_size = LABEL_SIZE, label_fontface = "bold")
-  fig <- cowplot::plot_grid(row1, row2, row3, ncol = 1,
-                             rel_heights = c(0.16, 0.64, 0.20))
+  fig <- cowplot::plot_grid(row1, row2, ncol = 1, rel_heights = c(80, 85))
+  save_nature_fig(fig, file.path(OUTDIR, "fig4_pathways.pdf"),
+                  width = FIG_WIDTH, height = (80 + 85) / 25.4)
 
-  outpath <- file.path(OUTDIR, "M1_Figure3_pathways.png")
-  # 14.0 in: panel b holds 100 label rows (50 pathways x 2 diseases) at 5 pt;
-  # 0.64 x 14.0 in gives ~2.0 mm per row inside the PDF (label height 1.76 mm).
-  save_nature_fig(fig, outpath, width = FIG_WIDTH, height = 14.0)
+  # Fig 5: the heatmap, at the size its absolute body and labels need.
+  log_msg("  Fig 5 heatmap: ", round(heatmap_fig$width_mm, 1), " x ",
+          round(heatmap_fig$height_mm, 1), " mm")
+  save_nature_fig(heatmap_fig$grob, file.path(OUTDIR, "fig5_pathway_heatmap.pdf"),
+                  width = heatmap_fig$width_mm / 25.4,
+                  height = heatmap_fig$height_mm / 25.4)
 }
 
 # =============================================================================
-# Figure 4: Donor-level Classification (4 panels, per-class SHAP)
-#   a: Out-of-fold confusion matrix (elastic net, per-donor consensus)
-#   b: Cell type ranking: one stacked bar per cell type, split by class
+# Figure 6 and Supplementary Figure 1 (build_fig4): Donor-level Classification
+#   Fig 6a: Out-of-fold confusion matrix (elastic net, per-donor consensus)
+#   Fig 6b: Cell type ranking: one stacked bar per cell type, split by class
 #      (HC / SLE / SjS); segment height = per-class mean |SHAP|. Ordered by the
 #      class-averaged mean, which is one third of the stacked height.
-#   c: Pathway ranking, stacked as in b
-#   d: Cell type × pathway |SHAP| toward each class: three heatmaps, one per
-#      class, sharing the row/column order of b and c and one sqrt colour scale
+#   Fig 6c: Pathway ranking, stacked as in b
+#   Supp Fig 1: Cell type × pathway |SHAP| toward each class: three heatmaps, one
+#      per class, sharing the row/column order of 6b and 6c and one sqrt colour
+#      scale
 #
 # Bars in b and c follow the shared stacked-bar convention (stack_outline():
 # plain geom_col segments under one no-fill rounded outline per bar, 0.75 pt).
@@ -1363,7 +1507,7 @@ build_fig4 <- function() {
     geom_tile(color = "white", linewidth = 1.2) +
     geom_text(aes(label = Freq), size = 3.0, fontface = "bold", vjust = -0.5) +
     geom_text(aes(label = sprintf("%.1f%%", row_pct * 100)),
-              size = 2.3, vjust = 1.5, color = "grey25") +
+              size = MIN_PT / ggplot2::.pt, vjust = 1.5, color = TEXT_COL) +
     scale_fill_gradient(low = "white", high = "#B71C1C",
                         limits = c(0, 1), guide = "none") +
     coord_fixed() +
@@ -1386,6 +1530,7 @@ build_fig4 <- function() {
                                    levels = unname(COND_LABEL))
   per_ct_tot <- aggregate(mean_mean_abs_shap ~ celltype_clean, per_ct_class, sum)
   panel_b <- ggplot(per_ct_class, aes(x = celltype_clean, y = mean_mean_abs_shap)) +
+    scale_x_discrete(labels = display_celltype) +
     geom_col(aes(fill = class_lab), width = 0.75, color = NA,
              position = position_stack(reverse = TRUE)) +
     stack_outline(per_ct_tot, "celltype_clean", "mean_mean_abs_shap", width = 0.75) +
@@ -1395,8 +1540,9 @@ build_fig4 <- function() {
     theme_nature() +
     theme(panel.grid.major.x = element_blank(),
           panel.grid.major.y = element_line(color = "grey92", linewidth = 0.25),
-          axis.text.x = element_text(size = BASE_SIZE - 2,
+          axis.text.x = element_text(size = MIN_PT,
                                      angle = 45, hjust = 1, vjust = 1),
+          plot.margin = margin(4, 2, 2, 2),   # room for the top 7 pt tick label
           legend.position = "inside",
           legend.position.inside = c(0.92, 0.85),
           legend.key.size = unit(3, "mm"),
@@ -1420,49 +1566,70 @@ build_fig4 <- function() {
     theme_nature() +
     theme(panel.grid.major.x = element_blank(),
           panel.grid.major.y = element_line(color = "grey92", linewidth = 0.25),
-          axis.text.x = element_text(size = BASE_SIZE - 2.5,
+          # Full width for the 50 labels: 2 pt right, and on the left the
+          # least margin that keeps the first 45-degree label on the page.
+          axis.text.x = element_text(size = MIN_PT,
                                      angle = 45, hjust = 1, vjust = 1),
-          plot.margin = margin(8, 16, 8, 16),
+          plot.margin = margin(8, 2, 8, 33),
           legend.position = "inside",
           legend.position.inside = c(0.95, 0.85),
           legend.key.size = unit(3, "mm"),
           legend.background = element_blank())
 
-  # ---- Panel D: heatmap, one per class, shared order and colour scale ----
+  # ---- Heatmap (own figure): one per class, shared order and colour scale ----
+  # Drawn with cell types as rows (ordered as b) and pathways as columns
+  # (ordered as c), the three classes stacked with their names in left-hand
+  # strips. Supplementary Figure 1: at 7 pt its 50 pathway labels need ~3.5 mm
+  # per column at 45 degrees, so it is drawn wider than a journal page
+  # (SUPP1_WIDTH_MM); colour bar below, so the columns get the full width.
   heat_df <- per_feat_class
-  heat_df$celltype_clean <- factor(clean_ct(heat_df$celltype), levels = ct_clean_order)
+  heat_df$celltype_clean <- factor(clean_ct(heat_df$celltype), levels = rev(ct_clean_order))
   heat_df$pathway_clean  <- factor(vapply(heat_df$pathway, clean_path, character(1)),
-                                   levels = rev(path_clean_order))
+                                   levels = path_clean_order)
   heat_df$class_lab      <- factor(COND_LABEL[heat_df$class], levels = unname(COND_LABEL))
 
-  panel_d <- ggplot(heat_df, aes(x = celltype_clean, y = pathway_clean,
+  panel_d <- ggplot(heat_df, aes(x = pathway_clean, y = celltype_clean,
                                  fill = mean_abs_shap)) +
     geom_tile(color = "white", linewidth = 0.2) +
     scale_fill_viridis_c(option = "rocket", direction = -1,
                          name = "Mean\n|SHAP|", trans = "sqrt",
-                         guide = guide_colorbar(barwidth = unit(1.5, "mm"),
-                                                barheight = unit(30, "mm"),
+                         guide = guide_colorbar(display = "rectangles",
+                                                direction = "horizontal",
+                                                barwidth = unit(40, "mm"),
+                                                barheight = unit(2, "mm"),
                                                 ticks.colour = "white",
                                                 frame.colour = NA)) +
-    facet_wrap(~ class_lab, ncol = 3) +
+    facet_wrap(~ class_lab, ncol = 1, strip.position = "right") +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0), labels = display_celltype) +
     labs(x = NULL, y = NULL) +
     theme_nature() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1,
-                                     size = BASE_SIZE - 3),
-          axis.text.y = element_text(size = BASE_SIZE - 3),
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = MIN_PT),
+          axis.text.y = element_text(size = MIN_PT),
           panel.grid  = element_blank(),
           axis.ticks  = element_blank(),
-          panel.border = element_rect(color = "black", fill = NA, linewidth = 0.4),
-          panel.spacing.x = unit(1, "mm"),
-          strip.text = element_text(size = BASE_SIZE, face = "bold"),
-          plot.margin = margin(2, 0, 2, 0),
-          legend.position = "right",
-          legend.title = element_text(size = BASE_SIZE - 2.5),
-          legend.text  = element_text(size = BASE_SIZE - 3),
+          panel.border = element_rect(color = "black", fill = NA, linewidth = FRAME_LWD / .pt),
+          panel.spacing.y = unit(2, "mm"),
+          strip.background = element_rect(fill = "grey50", colour = "black",
+                                          linewidth = FRAME_LWD / .pt),
+          strip.text.y.right = element_text(size = 8, face = "bold", colour = "white",
+                                            angle = -90),
+          plot.margin = margin(2, 2, 2, 2),
+          legend.position = "bottom",
+          legend.title.position = "top",
+          legend.title = element_text(size = MIN_PT, hjust = 0.5),
+          legend.text  = element_text(size = MIN_PT),
           legend.margin = margin(2, 2, 2, 2),
           legend.box.spacing = unit(2, "mm"))
 
-  # ---- Compose ----
+  panel_a <- panel_a + panel_title("Donor classification")
+  panel_b <- panel_b + panel_title("Cell-type importance")
+  panel_c <- panel_c + panel_title("Pathway importance")
+  panel_d <- panel_d + panel_title("Feature importance per class")
+
+  # ---- Compose: a | b over c; the heatmap is Supplementary Figure 1 ----
+  # Rows 72 and 95 mm plus 4 mm each for the panel titles
+  ROW1_MM <- 76; ROW2_MM <- 99; SUPP1_WIDTH_MM <- 225; SUPP1_HEIGHT_MM <- 244
   row1 <- cowplot::plot_grid(panel_a, NULL, panel_b, ncol = 3,
                              rel_widths = c(1, 0.08, 2),
                              labels = c("a", "", "b"),
@@ -1471,45 +1638,48 @@ build_fig4 <- function() {
   panel_c_labeled <- cowplot::plot_grid(panel_c, labels = "c",
                                         label_size = LABEL_SIZE,
                                         label_fontface = "bold", label_y = 1.0)
-  panel_d_labeled <- cowplot::plot_grid(panel_d, labels = "d",
-                                        label_size = LABEL_SIZE,
-                                        label_fontface = "bold", label_y = 1.0)
-  fig4 <- cowplot::plot_grid(row1, panel_c_labeled, panel_d_labeled,
-                             ncol = 1, rel_heights = c(60, 60, 130))
+  fig4 <- cowplot::plot_grid(row1, panel_c_labeled, ncol = 1,
+                             rel_heights = c(ROW1_MM, ROW2_MM))
 
-  HEIGHT_MM <- 60 + 60 + 130 + 8
-  HEIGHT_IN <- HEIGHT_MM / 25.4
-  outpath <- file.path(OUTDIR, "M1_Figure4_classification.pdf")
-  save_nature_fig(fig4, outpath, width = FIG_WIDTH, height = HEIGHT_IN)
-  # PNG for review
-  ggsave(sub("\\.pdf$", ".png", outpath), fig4,
-         width = FIG_WIDTH, height = HEIGHT_IN, dpi = 300, bg = "white")
+  save_nature_fig(fig4, file.path(OUTDIR, "fig6_classification.pdf"),
+                  width = FIG_WIDTH, height = (ROW1_MM + ROW2_MM) / 25.4)
+  save_nature_fig(class_strips(panel_d, CLASS_FILL),
+                  file.path(OUTDIR, "supp_fig1_shap_heatmap.pdf"),
+                  width = SUPP1_WIDTH_MM / 25.4, height = SUPP1_HEIGHT_MM / 25.4)
 }
 
 # =============================================================================
 # Copy PDFs to manuscript/figures/
 # =============================================================================
 
-FIG_MAP <- list(
-  c("M1_Figure2_disease_programs.pdf",      "fig2_disease_programs.pdf"),
-  c("M1_Figure3_pathways.pdf",              "fig3_pathways.pdf"),
-  c("M1_Figure4_classification.pdf",        "fig4_classification.pdf")
+# Files written by each build function, keyed by its --figure number. The
+# builders keep the old four-figure numbering; the files carry the manuscript's
+# numbering (Fig 1, the pipeline, is TikZ: fig1_pipeline.tex).
+FIG_FILES <- list(
+  `1` = "fig2_atlas.pdf",
+  `2` = "fig3_disease_programs.pdf",
+  `3` = c("fig4_pathways.pdf", "fig5_pathway_heatmap.pdf"),
+  `4` = c("fig6_classification.pdf", "supp_fig1_shap_heatmap.pdf")
 )
+# supp_* files belong to the supplementary material, the rest to the main text
+dest_dir <- function(f) file.path(ATLAS_ROOT, "manuscript",
+                                  if (startsWith(f, "supp_")) "supplementary" else "figures")
 
 copy_to_manuscript <- function(fig_num = NULL) {
-  MANUSCRIPT_FIGDIR <- file.path(ATLAS_ROOT, "manuscript", "figures")
-  dir.create(MANUSCRIPT_FIGDIR, recursive = TRUE, showWarnings = FALSE)
+  if (DRAFT_OUTPUT) {
+    log_msg("  FIG_OUTDIR is set: figures stay in ", OUTDIR, "; manuscript/figures untouched")
+    return(invisible(NULL))
+  }
   # When fig_num is set (i.e. called from --figure N), restrict the copy to
-  # the FIG_MAP entry whose source filename references that figure number,
-  # so a single-figure rebuild can never propagate a stale sibling PDF.
-  pattern <- if (!is.null(fig_num)) paste0("^M1_Figure", fig_num, "_") else NULL
-  for (fm in FIG_MAP) {
-    if (!is.null(pattern) && !grepl(pattern, fm[1])) next
-    src <- file.path(OUTDIR, fm[1])
-    dst <- file.path(MANUSCRIPT_FIGDIR, fm[2])
+  # the files that build wrote, so a single-figure rebuild can never
+  # propagate a stale sibling PDF.
+  files <- if (!is.null(fig_num)) FIG_FILES[[as.character(fig_num)]] else unlist(FIG_FILES)
+  for (f in files) {
+    src <- file.path(OUTDIR, f)
     if (file.exists(src)) {
-      file.copy(src, dst, overwrite = TRUE)
-      log_msg("  Copied: ", fm[1], " -> manuscript/figures/", fm[2])
+      dir.create(dest_dir(f), recursive = TRUE, showWarnings = FALSE)
+      file.copy(src, file.path(dest_dir(f), f), overwrite = TRUE)
+      log_msg("  Copied: ", f, " -> ", sub(paste0(ATLAS_ROOT, "/"), "", dest_dir(f), fixed = TRUE), "/", f)
     }
   }
 }
@@ -1520,7 +1690,7 @@ copy_to_manuscript <- function(fig_num = NULL) {
 
 main <- function() {
   log_msg("=" %>% rep(60) %>% paste(collapse = ""))
-  log_msg("  Composing Manuscript 1 Figures (Nature Comms: 180mm width, 450 DPI, Helvetica)")
+  log_msg("  Composing Manuscript 1 figures (190 mm print width, text >= 7 pt)")
   log_msg("=" %>% rep(60) %>% paste(collapse = ""))
   log_msg("  Output: ", OUTDIR)
 
@@ -1533,8 +1703,8 @@ main <- function() {
 
   log_msg("")
   log_msg("=" %>% rep(60) %>% paste(collapse = ""))
-  log_msg("  Manuscript 1 figures saved (180mm width, PNG + PDF)")
-  log_msg("  Main: figs 1, 2, 3, 4")
+  log_msg("  Manuscript 1 figures saved (190 mm print width, PDF)")
+  log_msg("  Files: ", paste(unlist(FIG_FILES), collapse = ", "))
   log_msg("  ", OUTDIR)
   log_msg("=" %>% rep(60) %>% paste(collapse = ""))
 }

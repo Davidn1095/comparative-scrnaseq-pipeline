@@ -129,14 +129,14 @@ sig_genes <- deseq2_all %>%
     !is.na(padj),
     padj < PADJ_THRESH,
     abs(log2FoldChange) > LFC_THRESH,
-    !grepl(EXCLUDED_GENE_REGEX, gene, ignore.case = TRUE)
+    !is_excluded_gene(gene)
   )
 
 cat("  Significant DE genes:", n_distinct(sig_genes$gene), "\n")
 
 # Save signatures per disease per cell type — uncapped: writing every
 # gene that passes the strict thresholds (padj < PADJ_THRESH,
-# |log2FC| > LFC_THRESH, MT/RPL/RPS/HB excluded). Previously capped at
+# |log2FC| > LFC_THRESH, is_excluded_gene() genes removed). Previously capped at
 # TOP_N_GENES=50 per (disease, cell_type), but that ceiling clipped panel a
 # of fig2 (DEG counts) to 50 for cell types with hundreds of true DEGs.
 signatures <- sig_genes %>%
@@ -243,7 +243,7 @@ if (length(gsea_results) > 0) {
 
 cat("\nCalculating condition similarity...\n")
 
-# Same-sign Jaccard, aligned with the pathway-level definition used for Fig 3c:
+# Same-sign Jaccard, aligned with the pathway-level definition used for Fig 4b:
 # a gene counts as shared only when it is significant in both diseases AND moves
 # in the same direction; the denominator is the union of genes significant in
 # either. The magnitude criterion still differs between the two levels (genes

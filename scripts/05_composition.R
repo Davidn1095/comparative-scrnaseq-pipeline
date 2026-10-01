@@ -5,7 +5,8 @@
 # Computes per-donor proportions of the 25 retained cell types, then runs
 # speckle::propeller separately for three pairwise comparisons:
 #   HC vs SLE, HC vs SjS, SLE vs SjS
-# under the arcsin-sqrt transform. BH-corrects within each comparison.
+# under the arcsin-sqrt transform. Benjamini-Hochberg runs over all 75 tests
+# (25 cell types x 3 comparisons) as one family, not within each comparison.
 #
 # Inputs:
 #   results/objects/atlas_integrated.rds  (Seurat object with meta.data
@@ -88,20 +89,11 @@ run_pair <- function(meta_sub, label_g1, label_g2, comparison_name) {
     fold_change   = res[[prop_g2_col]] / res[[prop_g1_col]],
     log2_fc       = log2(res[[prop_g2_col]] / res[[prop_g1_col]]),
     p_value       = res$P.Value,
-    fdr           = p.adjust(res$P.Value, method = "BH"),
     stringsAsFactors = FALSE
   )
   colnames(out)[2:3] <- c(paste0("mean_prop_", label_g1),
                           paste0("mean_prop_", label_g2))
-  out$significant <- out$fdr < 0.05
   out$comparison  <- comparison_name
-  out <- out[order(out$fdr), ]
-
-  fname <- paste0("propeller_", comparison_name, ".tsv")
-  write.table(out, file.path(OUTDIR, fname),
-              sep = "\t", row.names = FALSE, quote = FALSE)
-  log_msg("Wrote: ", fname, " (", nrow(out), " rows, ",
-          sum(out$significant), " significant at FDR<0.05)")
   out
 }
 
@@ -112,6 +104,26 @@ res_hc_sjs <- run_pair(meta[meta$condition %in% c("healthy", "sjs"), ],
                        "healthy", "sjs", "HC_vs_SjS")
 res_sle_sjs <- run_pair(meta[meta$condition %in% c("sle", "sjs"), ],
                         "sle", "sjs", "SLE_vs_SjS")
+
+# One multiple-testing family. The three comparisons are reported and read
+# together (Fig 2e, Supplementary Table 2 and the cross-comparison statements in
+# the Results), so Benjamini-Hochberg runs over all 75 P-values at once rather
+# than within each block of 25. The raw P-values are untouched.
+fam <- list(res_hc_sle, res_hc_sjs, res_sle_sjs)
+q <- p.adjust(unlist(lapply(fam, `[[`, "p_value")), method = "BH")
+n_per <- vapply(fam, nrow, integer(1))
+q <- split(q, rep(seq_along(fam), n_per))
+for (i in seq_along(fam)) {
+  fam[[i]]$fdr <- q[[i]]
+  fam[[i]]$significant <- fam[[i]]$fdr < 0.05
+  fam[[i]] <- fam[[i]][order(fam[[i]]$fdr), ]
+  fname <- paste0("propeller_", fam[[i]]$comparison[1], ".tsv")
+  write.table(fam[[i]], file.path(OUTDIR, fname),
+              sep = "\t", row.names = FALSE, quote = FALSE)
+  log_msg("Wrote: ", fname, " (", nrow(fam[[i]]), " rows, ",
+          sum(fam[[i]]$significant), " significant at FDR<0.05 over all 75 tests)")
+}
+res_hc_sle <- fam[[1]]; res_hc_sjs <- fam[[2]]; res_sle_sjs <- fam[[3]]
 
 # Combined summary: long table with one row per (cell_type, comparison)
 to_long <- function(df, g1, g2) {

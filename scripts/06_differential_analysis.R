@@ -300,7 +300,7 @@ run_deseq2_analysis <- function(disease, celltype_ncells = NULL,
       stringsAsFactors = FALSE
     )
 
-    df <- df[!grepl(EXCLUDED_GENE_REGEX, df$gene, ignore.case = TRUE), ]
+    df <- df[!is_excluded_gene(df$gene), ]
     df <- df[!is.na(df$pvalue), ]
     df <- df[order(df$padj, df$pvalue), ]
 

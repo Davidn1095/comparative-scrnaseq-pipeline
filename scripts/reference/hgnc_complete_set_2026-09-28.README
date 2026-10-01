@@ -1,0 +1,17 @@
+HGNC complete set, the reference symbol set for gene-symbol harmonisation.
+
+File:      hgnc_complete_set_2026-09-28.txt.gz (gzip -n -9 of the download, unchanged)
+Source:    https://storage.googleapis.com/public-download-files/hgnc/tsv/tsv/hgnc_complete_set.txt
+           (HGNC "complete set", the current release at the time of download)
+Download:  2026-09-28
+MD5:       b1e49ff9b0e9e195603b49925daa76ca  (uncompressed hgnc_complete_set.txt)
+Contents:  45,111 approved HGNC entries; columns as published by HGNC.
+
+Used by hgnc_table(), hgnc_map_symbols() and harmonise_symbols() in scripts/00_config.R and by
+harmonise_genes() in scripts/00_utils.R. Every dataset's genes are mapped onto the approved
+symbols of this release: by Ensembl gene ID where the dataset deposits one, otherwise, or when
+HGNC does not list the ID, by approved symbol, then by a previous symbol and then by an alias,
+each only when it points to exactly one approved symbol. The same symbol mapping is applied to
+the Hallmark gene sets, the gene-exclusion lists and the Toro-Dominguez 2014 signature, so that
+all of them share one namespace. The 2026-09-28 file is also the source of the HGNC L and S
+ribosomal protein groups listed in EXCLUDED_RIBOSOMAL_GENES.

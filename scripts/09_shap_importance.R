@@ -21,8 +21,10 @@
 #   shap_importance_per_pathway_per_class.tsv   50 pathways × 3 classes (long)
 #
 # Inputs (results/donor_classifiers_<method>/):
-#   feature_matrix.rds                     X_raw + donor metadata
-#   fold_models/<classifier>_rep*_fold*.rds  per-fold trained models + pp
+#   feature_matrix.rds                     donor metadata and feature names
+#   fold_models/<classifier>_rep*_fold*.rds  per-fold trained models + pp, and the
+#                                          fold's held-out features (X_test_raw),
+#                                          batch-corrected within the fold
 ################################################################################
 
 # Optional extra R library searched before the default ones, for packages
@@ -97,8 +99,7 @@ log_msg("Reading fold models from: ", FOLD_MODELS_DIR)
 log_msg("Writing SHAP to:          ", SHAP_OUTDIR)
 
 fm <- readRDS(file.path(OUTDIR, "feature_matrix.rds"))
-X_raw  <- fm$X_raw
-donors <- rownames(X_raw)
+donors <- rownames(fm$pheno)
 feats  <- fm$feature_names
 classes <- c("healthy", "sle", "sjs")
 log_msg("Feature matrix: ", length(donors), " donors × ", length(feats), " features")
@@ -128,7 +129,9 @@ per_fold_ct_rows <- list()
 per_fold_pw_rows <- list()
 
 fold_shap <- function(b, classifier) {
-  X_te <- apply_preproc(X_raw[b$test_idx, , drop = FALSE], b$pp)
+  # The held-out features of this fold, batch-corrected with the fold's training fit
+  stopifnot(!is.null(b$X_test_raw), identical(colnames(b$X_test_raw), feats))
+  X_te <- apply_preproc(b$X_test_raw, b$pp)
   out <- array(0, dim = c(nrow(X_te), length(feats), length(classes)),
                dimnames = list(b$donor_ids_test, feats, classes))
   if (classifier == "xgb") {
@@ -259,8 +262,8 @@ log_msg("Wrote: shap_importance_per_pathway.tsv (", nrow(per_pw), " rows)")
 # those values over the 50 pathways within each cell type and over the 25 cell
 # types within each pathway. Long format, one row per (unit, class), rows in
 # the class-averaged order above. Averaging the three class rows of any unit
-# reproduces its class-averaged value. These feed Fig 4b-d (per-class stacked
-# bars, per-class heatmaps) and Supplementary Table 7. No per-class fold SDs
+# reproduces its class-averaged value. These feed Figs 6b, 6c and Supplementary Fig 1 (per-class
+# stacked bars, per-class heatmaps) and Supplementary Table 9. No per-class fold SDs
 # are written: they are large by construction for the 14-donor SjS class and
 # are not reported anywhere.
 per_feat_class <- do.call(rbind, lapply(seq_along(classes), function(k) data.frame(

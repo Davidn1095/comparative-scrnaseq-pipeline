@@ -4,7 +4,7 @@
 #
 # Purpose: Merge all annotated datasets into a unified atlas. No integration is
 #          performed here: PCA/Harmony/UMAP were stripped as unused. The
-#          batch-corrected embedding used by Fig 1 comes from scVI (04b).
+#          batch-corrected embedding used by Fig 2 comes from scVI (04b).
 #
 # Input:
 #   - Annotated Seurat objects from script 02 (*_qc_preproc_singler_monaco.rds)
@@ -106,6 +106,14 @@ read_obj <- function(d) {
 
   obj <- readRDS(rds)
 
+  # One sample per donor (FIRST_VISIT_ONLY in 00_config.R), before the merge, so that
+  # composition, the classifiers and every other atlas-level analysis see one visit.
+  obj <- keep_first_visit(obj, acc)
+
+  # Gene names onto the HGNC reference (harmonise_genes() in 00_utils.R) before the merge, so
+  # that a gene the datasets name differently becomes one row of the atlas.
+  obj <- harmonise_genes(obj, acc, d)
+
   # Standardize metadata (always use folder-based disease label)
   obj$dataset_id <- acc
   obj$disease <- disease
@@ -187,7 +195,7 @@ seu <- safe_join_layers(seu)
 # 3. Standard Seurat workflow
 ################################################################################
 
-log_msg("Running Seurat workflow (normalisation only; PCA/Harmony/UMAP stripped — not consumed by any downstream script; Fig 1 UMAP comes from scVI latent in results/integration/scvi_full_gpu/)...")
+log_msg("Running Seurat workflow (normalisation only; PCA/Harmony/UMAP stripped — not consumed by any downstream script; Fig 2 UMAP comes from scVI latent in results/integration/scvi_full_gpu/)...")
 
 seu <- NormalizeData(seu, verbose = FALSE)
 seu <- FindVariableFeatures(seu, nfeatures = N_VARIABLE_FEATURES, verbose = FALSE)
@@ -285,8 +293,8 @@ saveRDS(seu, file.path(OBJ_DIR, "atlas_integrated.rds"))
 #    Triggered by env var SCVI_EXTRACT=1. Writes a sparse Matrix Market file +
 #    per-cell metadata + per-gene table to results/integration/
 #    scvi_visualisation/extracted/. Restricted to the 25 common cell types
-#    (matches Fig 1 panels b-e) and the top 2000 HVGs. scripts/04b_train_scvi.py
-#    consumes these files; the resulting latent UMAP is used for Fig 1 only,
+#    (matches Fig 2 panels a-d) and the top 2000 HVGs. scripts/04b_train_scvi.py
+#    consumes these files; the resulting latent UMAP is used for Fig 2 only,
 #    not for any downstream DE/GSEA/composition/classifier step.
 ################################################################################
 

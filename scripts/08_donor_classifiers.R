@@ -2,20 +2,27 @@
 ################################################################################
 # 08_donor_classifiers.R — Donor-level Hallmark-pathway classifiers
 #
-# Builds a 291-donor × 1250-feature matrix where each feature is the mean
-# Seurat AddModuleScore for one MSigDB Hallmark pathway aggregated over a
-# donor's cells of a given cell type. Trains three classifiers (ranger RF,
-# XGBoost, glmnet multinomial elastic net) under stratified 5×5 CV (25 folds).
+# Each donor is described by 1,250 features: the mean Seurat AddModuleScore of one
+# MSigDB Hallmark pathway over the donor's cells of one of 25 cell types, on
+# expression batch-corrected per cell type. Three classifiers (ranger RF, XGBoost,
+# glmnet multinomial elastic net) are trained under 5×5 CV (25 folds) stratified by
+# class and dataset jointly.
 #
-# Outputs (results/donor_classifiers/):
-#   feature_matrix.rds          291 × 1250 numeric matrix + donor metadata
+# Outputs (results/donor_classifiers_<method>/):
+#   donor_expression_sums.rds   per cell type, gene × donor expression sums (cache)
+#   feature_matrix.rds          X_folds, the 25 per-fold feature matrices (291 × 1250),
+#                               donor metadata (pheno), the folds and the cases left
+#                               uncorrected
 #   cv_predictions.tsv          per-fold per-donor true + predicted + prob
 #   benchmark.tsv               mean ± sd metrics per classifier
 #   feature_importance.tsv      top-30 features per classifier
 #   confusion_matrices.pdf      3-panel CM (concatenated CV predictions)
+#   fold_models/                per-fold models, preprocessing and held-out features
 #
-# Preprocessing leak protection: median imputation + z-score normalisation
-# fit inside each fold's training partition only, then applied to its test.
+# Leak protection: the batch correction is fitted inside each fold on the training
+# donors and applied to the held-out donors without their labels (Phase 1), and
+# median imputation and z-score normalisation are fitted on the training partition
+# only, then applied to its test.
 ################################################################################
 
 # Optional extra R library searched before the default ones, for packages
@@ -80,325 +87,251 @@ SCVI_INPUT_DIR <- file.path(ATLAS_ROOT, "data", "scvi_input")
 set.seed(42)
 
 # =========================================================================
-# Phase 1: Build feature matrix (291 × 1250) — cached on disk if available
+# Phase 1: Features, from per-donor expression sums (cached on disk)
 # =========================================================================
-
-# The skip below is an operational trap, and it has bitten. The feature matrix is
-# derived from atlas_integrated.rds, so it goes stale the moment the atlas is rebuilt -
-# but this branch reuses it silently, the classifiers train on the OLD features, and
-# 09 then reports SHAP off those models. A rerun after the Perez re-ingestion looked
-# like it had worked and returned performance identical to four decimal places,
-# because it was the cache. Announce it, and allow an override.
+# limma / limma_modulescore. The dataset effect is removed per cell type as
+# limma::removeBatchEffect removes it: least squares with condition (treatment
+# contrasts) and dataset (sum-to-zero contrasts) in the design, the dataset
+# coefficients then subtracted. Each Hallmark score is averaged over a donor's cells
+# of the cell type. The fit uses the donors' labels, so it is made inside every
+# cross-validation fold from the training donors only and applied to all donors, the
+# held-out ones without their labels (Phase 2). Fitting it once on all 291 donors
+# before cross-validation let the held-out donors' own labels into their features.
 #
-#   FORCE_FEATURES=1   rebuild the feature matrix, ignoring any cached copy
-# The banner alone was not enough. On 2026-08-12 it printed exactly as designed -
-# matrix built 09:59:33, atlas 12:05:40 - and the run carried on and trained every
+# Both the correction and a donor's mean score are linear in the cells' expression,
+# so each fold's features are computed exactly from per-donor expression sums per cell
+# type, built once here: least squares on the cells equals least squares on the donor
+# means weighted by cells per donor. With limma_modulescore, AddModuleScore's
+# control-gene draw (Seurat 5.4.0, AddModuleScore.Assay; nbin 25, ctrl 100, seed 42) is
+# replayed from the genes' mean corrected expression over all cells of the cell type.
+# Genes whose means tie exactly are ordered by floating-point noise, so a few control
+# sets can differ from a per-cell AddModuleScore run.
+#
+# none. AddModuleScore on the uncorrected expression; no fit, so one matrix serves
+# every fold.
+#
+# The cache (the donor sums, or for none the uncorrected matrix) is derived from the
+# atlas, and reusing it silently has bitten twice. After the Perez re-ingestion a rerun
+# returned performance identical to four decimal places because it was the cache; on
+# 2026-08-12 a stale-cache banner printed exactly as designed and the run trained every
 # classifier on the stale features anyway, because warning and proceeding is still
-# proceeding. A cache must invalidate itself: reuse only while it is NEWER than the
-# atlas it was derived from, and rebuild otherwise. FORCE_FEATURES=1 additionally
-# forces a rebuild even when the cache is still valid.
+# proceeding. The cache is reused only while it is NEWER than the atlas, and rebuilt
+# otherwise. FORCE_FEATURES=1 also forces a rebuild.
 force_features <- tolower(Sys.getenv("FORCE_FEATURES", "0")) %in% c("1", "true", "yes")
 ATLAS_RDS  <- file.path(OBJ_DIR, "atlas_integrated.rds")
-fm_mtime    <- if (file.exists(FEATURE_MATRIX_PATH)) file.info(FEATURE_MATRIX_PATH)$mtime else NA
+CACHE_PATH <- file.path(OUTDIR, if (DENOISE_METHOD == "none") "features_uncorrected.rds"
+                                else "donor_expression_sums.rds")
+cache_mtime <- if (file.exists(CACHE_PATH)) file.info(CACHE_PATH)$mtime else NA
 atlas_mtime <- if (file.exists(ATLAS_RDS)) file.info(ATLAS_RDS)$mtime else NA
 stamp <- function(x) if (is.na(x)) "missing" else format(x, "%Y-%m-%d %H:%M:%S")
-cache_stale <- !is.na(fm_mtime) && !is.na(atlas_mtime) && atlas_mtime > fm_mtime
+cache_stale <- !is.na(cache_mtime) && !is.na(atlas_mtime) && atlas_mtime > cache_mtime
 
-if (file.exists(FEATURE_MATRIX_PATH) && force_features)
-  log_msg("FORCE_FEATURES=1: rebuilding, ignoring ", FEATURE_MATRIX_PATH)
+if (file.exists(CACHE_PATH) && force_features)
+  log_msg("FORCE_FEATURES=1: rebuilding, ignoring ", CACHE_PATH)
 if (cache_stale && !force_features) {
   log_msg(strrep("!", 74))
-  log_msg("!! CACHED FEATURE MATRIX IS STALE - rebuilding from the current atlas")
-  log_msg("!!   matrix built ", stamp(fm_mtime))
-  log_msg("!!   atlas  built ", stamp(atlas_mtime), "   <-- newer")
-  log_msg("!! The matrix is derived from the atlas, so it cannot be reused. Training on")
+  log_msg("!! CACHED FEATURE INPUT IS STALE - rebuilding from the current atlas")
+  log_msg("!!   cache built ", stamp(cache_mtime))
+  log_msg("!!   atlas built ", stamp(atlas_mtime), "   <-- newer")
+  log_msg("!! The cache is derived from the atlas, so it cannot be reused. Training on")
   log_msg("!! it would make every classifier metric, and all SHAP downstream of it,")
   log_msg("!! silently describe a superseded atlas.")
   log_msg(strrep("!", 74))
 }
-if (file.exists(FEATURE_MATRIX_PATH) && !force_features && !cache_stale) {
-  log_msg("Reusing cached feature matrix (matrix ", stamp(fm_mtime),
-          " is newer than atlas ", stamp(atlas_mtime), "): ", FEATURE_MATRIX_PATH)
-  fm <- readRDS(FEATURE_MATRIX_PATH)
-} else {
-  log_msg("Building feature matrix from scratch.")
-
-  if (DENOISE_METHOD %in% c("limma", "limma_modulescore")) {
-    USE_MODULESCORE <- (DENOISE_METHOD == "limma_modulescore")
-    # In-memory regeneration: load atlas, per cell type subset → apply
-    # limma::removeBatchEffect → Hallmark score per cell → donor mean.
-    # When USE_MODULESCORE is TRUE the per-cell Hallmark score is
-    # Seurat::AddModuleScore (control-gene-normalised); otherwise it is the
-    # plain colMeans over set genes. All in memory; no intermediates.
-    log_msg("Loading atlas for in-memory limma regeneration (~2.5 min)...")
-    if (USE_MODULESCORE) log_msg("Per-cell scoring: AddModuleScore (nbin=25, ctrl=100, seed=42)")
-    else                 log_msg("Per-cell scoring: colMeans (simple mean)")
-    obj <- readRDS(file.path(OBJ_DIR, "atlas_integrated.rds"))
-
-    log_msg("Loading Hallmark gene sets...")
-    hallmark_list <- load_msigdb_hallmark(MSIGDB_RDS)
-
-    # Gene pool selection.
-    #   limma:             HVGs (signal-carrying genes for the simple-mean path).
-    #   limma_modulescore: union of all 50 Hallmark pathway genes. Aligns the
-    #                      gene pool with the feature definition and gives
-    #                      AddModuleScore enough genes for nbin=25 binning
-    #                      (~4000 / 25 ≈ 160 per bin, well above ctrl=100).
-    if (USE_MODULESCORE) {
-      hvg <- unique(unlist(hallmark_list))
-      hvg <- hvg[!grepl(EXCLUDED_GENE_REGEX, hvg)]
-      hvg <- intersect(hvg, rownames(obj))
-      log_msg("  Hallmark gene union: ", length(hvg),
-              " genes (post-EXCLUDED_GENE_REGEX filter, intersected with atlas)")
-    } else {
-      hvg <- Seurat::VariableFeatures(obj)
-      hvg <- hvg[!grepl(EXCLUDED_GENE_REGEX, hvg)]
-      hvg <- intersect(hvg, rownames(obj))
-      log_msg("  HVG set: ", length(hvg), " genes (post-EXCLUDED_GENE_REGEX filter)")
-    }
-
-    # Pull log-normalised expression for the chosen gene pool once, keep sparse.
-    expr_hvg <- LayerData(obj, layer = "data")[hvg, , drop = FALSE]
-    meta_all <- obj@meta.data
-    rm(obj); gc()
-    log_msg("  Pool expression: ", nrow(expr_hvg), " genes × ", ncol(expr_hvg), " cells")
-
-    # Restrict to canonical 25 cell types
-    meta_all <- meta_all[is_common_celltype(meta_all$cell_type), ]
-    log_msg("  Atlas cells in 25 common cell types: ", nrow(meta_all))
-
-    cts_in_meta <- unique(meta_all$cell_type)
-    log_msg("  Processing ", length(cts_in_meta), " cell types")
-
-    donor_ct_long <- list()
-    for (ct in cts_in_meta) {
-      t0 <- Sys.time()
-      cl_cells <- rownames(meta_all)[meta_all$cell_type == ct]
-      cl_meta <- meta_all[cl_cells, , drop = FALSE]
-      # Subset + dense for limma
-      cl_expr <- as.matrix(expr_hvg[, cl_cells, drop = FALSE])
-
-      batch_fac <- factor(cl_meta$dataset_id)
-      if (nlevels(batch_fac) > 1) {
-        cond_fac <- factor(cl_meta$condition)
-        design <- model.matrix(~cond_fac)
-        cl_expr <- limma::removeBatchEffect(cl_expr, batch = batch_fac,
-                                            design = design)
-      }
-      # cl_expr is genes × cells, limma-corrected (in-memory only)
-
-      donor_ids <- cl_meta$donor_id
-      donors <- unique(donor_ids)
-      df <- data.frame(donor_id = donors,
-                       cell_type = ct, stringsAsFactors = FALSE)
-
-      if (USE_MODULESCORE) {
-        # Wrap the limma-corrected matrix in a minimal Seurat object and run
-        # AddModuleScore for per-cell control-gene-normalised pathway scores.
-        # Counts slot is required by CreateSeuratObject; we pass a clamped
-        # copy of the corrected matrix (non-negatives), then immediately
-        # overwrite the data slot with the actual residuals.
-        cl_expr_sparse <- as(Matrix::Matrix(cl_expr, sparse = TRUE), "dgCMatrix")
-        counts_placeholder <- cl_expr_sparse
-        counts_placeholder@x[counts_placeholder@x < 0] <- 0
-        tmp_obj <- CreateSeuratObject(counts = counts_placeholder,
-                                      assay  = "RNA")
-        LayerData(tmp_obj, layer = "data", assay = "RNA") <- cl_expr_sparse
-        hs_score <- lapply(hallmark_list, function(g) intersect(g, rownames(tmp_obj)))
-        keep <- sapply(hs_score, length) > 0
-        hs_score <- hs_score[keep]
-        suppressWarnings(suppressMessages({
-          tmp_obj <- AddModuleScore(tmp_obj, features = hs_score,
-                                    name = "HM_", nbin = 25, ctrl = 100,
-                                    seed = 42)
-        }))
-        score_cols <- paste0("HM_", seq_along(hs_score))
-        mod_scores <- tmp_obj@meta.data[, score_cols, drop = FALSE]
-        colnames(mod_scores) <- names(hs_score)
-        for (h_name in names(hallmark_list)) {
-          if (h_name %in% colnames(mod_scores)) {
-            donor_mean <- tapply(mod_scores[[h_name]], donor_ids, mean)
-            df[[h_name]] <- donor_mean[donors]
-          } else {
-            df[[h_name]] <- NA_real_
-          }
-        }
-        rm(tmp_obj, mod_scores, cl_expr_sparse, counts_placeholder); gc()
-      } else {
-        for (h_name in names(hallmark_list)) {
-          fg <- intersect(hallmark_list[[h_name]], rownames(cl_expr))
-          if (length(fg) == 0) {
-            df[[h_name]] <- NA_real_
-          } else {
-            cell_score <- colMeans(cl_expr[fg, , drop = FALSE])
-            donor_mean <- tapply(cell_score, donor_ids, mean)
-            df[[h_name]] <- donor_mean[donors]
-          }
-        }
-      }
-      donor_ct_long[[ct]] <- df
-
-      rm(cl_expr); gc()
-      dt_sec <- round(as.numeric(Sys.time() - t0, units = "secs"), 1)
-      log_msg("    ", ct, ": ", length(donors), " donors, ", length(cl_cells),
-              " cells (", dt_sec, "s)")
-    }
-
-    rm(expr_hvg); gc()
-
-    donor_ct_means <- do.call(rbind, donor_ct_long)
-    log_msg("  donor × cell_type rows: ", nrow(donor_ct_means))
-
-    long <- donor_ct_means %>%
-      pivot_longer(cols = all_of(names(hallmark_list)),
-                   names_to = "pathway", values_to = "score") %>%
-      mutate(feature = paste0(pathway, "__",
-                              gsub("[-/ ]", "_", cell_type)))
-    wide <- long %>%
-      select(donor_id, feature, score) %>%
-      pivot_wider(names_from = feature, values_from = score)
-    donor_ids_all <- wide$donor_id
-    X <- as.matrix(wide[, -1]); rownames(X) <- donor_ids_all
-
-    log_msg("  Pre-impute: ", nrow(X), " donors × ", ncol(X), " features")
-    log_msg("  NA count before imputation: ", sum(is.na(X)),
-            " (", round(100 * sum(is.na(X)) / length(X), 2), "%)")
-
-    # Donor metadata: pheno (donor_id × condition) from atlas meta_all
-    donor_first <- meta_all[!duplicated(meta_all$donor_id),
-                            c("donor_id", "condition")]
-    rownames(donor_first) <- donor_first$donor_id
-    pheno <- data.frame(
-      donor_id = donor_ids_all,
-      condition = donor_first[donor_ids_all, "condition"],
-      stringsAsFactors = FALSE
-    )
-    rownames(pheno) <- donor_ids_all
-
-    fm <- list(X_raw = X, pheno = pheno,
-               feature_names = colnames(X),
-               hallmark_set_sizes = sapply(hallmark_list, length))
-    saveRDS(fm, FEATURE_MATRIX_PATH)
-    log_msg("  Saved: ", FEATURE_MATRIX_PATH)
-    skip_atlas_block <- TRUE
+# The sums also depend on the gene exclusion (the gene pool drops excluded genes), which
+# the atlas date cannot see: the cache records the exclusion it was built with and is
+# rebuilt when EXCLUDED_GENES changes.
+EXCLUSION_KEY <- paste(sort(EXCLUDED_GENES), collapse = ",")
+cache <- NULL
+if (file.exists(CACHE_PATH) && !force_features && !cache_stale) {
+  cache <- readRDS(CACHE_PATH)
+  if (identical(cache$exclusion, EXCLUSION_KEY)) {
+    log_msg("Reusing cached feature input (", stamp(cache_mtime), ", newer than atlas ",
+            stamp(atlas_mtime), ", same gene exclusion): ", CACHE_PATH)
   } else {
-    log_msg("Loading atlas (~2.5 min)...")
-    obj <- readRDS(file.path(OBJ_DIR, "atlas_integrated.rds"))
-    skip_atlas_block <- FALSE
+    log_msg("Cached feature input was built with a different gene exclusion - rebuilding")
+    cache <- NULL
   }
-
-  if (!skip_atlas_block) {
+}
+if (is.null(cache)) {
+  log_msg("Loading atlas (~2.5 min)...")
+  obj <- readRDS(ATLAS_RDS)
   log_msg("Loading Hallmark gene sets...")
   hallmark_list <- load_msigdb_hallmark(MSIGDB_RDS)
-  log_msg("  ", length(hallmark_list), " Hallmark sets, ",
-          length(unique(unlist(hallmark_list))), " unique genes")
 
-  # Restrict each set to genes present in the atlas
-  atlas_genes <- rownames(obj)
-  hallmark_list <- lapply(hallmark_list,
-                          function(g) intersect(g, atlas_genes))
-  set_sizes <- sapply(hallmark_list, length)
-  log_msg("  Per-Hallmark set size after intersecting atlas: median=",
-          median(set_sizes), " min=", min(set_sizes), " max=", max(set_sizes))
-  stopifnot(all(set_sizes >= 5))
-
-  # The block below is only for DENOISE_METHOD == "none" (Seurat AddModuleScore
-  # on raw log-normalised expression).
   if (DENOISE_METHOD == "none") {
-  log_msg("AddModuleScore on 50 Hallmark sets (15-25 min)...")
-  obj <- AddModuleScore(obj, features = hallmark_list,
-                        name = "HM_", nbin = 25, ctrl = 100, seed = 42)
-
-  # AddModuleScore writes columns HM_1 ... HM_50 (in the order of the list).
-  # Rename to the actual hallmark names.
-  score_cols <- paste0("HM_", seq_along(hallmark_list))
-  stopifnot(all(score_cols %in% colnames(obj@meta.data)))
-  colnames(obj@meta.data)[match(score_cols, colnames(obj@meta.data))] <-
-    names(hallmark_list)
-
-  log_msg("Aggregating per donor × cell type (mean score)...")
-  meta <- obj@meta.data
-  rm(obj); gc()
-
-  # Restrict to the canonical 25 cell types
-  meta <- meta[is_common_celltype(meta$cell_type), ]
-  log_msg("  Cells in 25 common cell types: ", nrow(meta))
-
-  # Aggregate
-  donor_ct_means <- meta %>%
-    group_by(donor_id, cell_type) %>%
-    summarise(across(all_of(names(hallmark_list)), \(x) mean(x, na.rm = TRUE)),
-              .groups = "drop")
-  log_msg("  donor × cell_type rows: ", nrow(donor_ct_means))
-
-  # Pivot to donor × (pathway × cell_type)
-  long <- donor_ct_means %>%
-    pivot_longer(cols = all_of(names(hallmark_list)),
-                 names_to = "pathway", values_to = "score") %>%
-    mutate(feature = paste0(pathway, "__",
-                            gsub("[-/ ]", "_", cell_type)))
-  # 291 donors × 25 cell types × 50 pathways = 363,750 rows (some donors
-  # have no cells of a given cell type → those rows absent → NAs after pivot)
-
-  wide <- long %>%
-    select(donor_id, feature, score) %>%
-    pivot_wider(names_from = feature, values_from = score)
-
-  donor_ids <- wide$donor_id
-  X <- as.matrix(wide[, -1])
-  rownames(X) <- donor_ids
-
-  log_msg("  Pre-impute: ", nrow(X), " donors × ", ncol(X), " features")
-  log_msg("  NA count before imputation: ", sum(is.na(X)),
-          " (", round(100 * sum(is.na(X)) / length(X), 2), "%)")
-
-  # Donor labels — one row per unique donor from meta
-  pheno <- meta %>%
-    group_by(donor_id) %>%
-    summarise(condition = first(condition),
-              dataset_id = first(dataset_id), .groups = "drop")
-  pheno <- as.data.frame(pheno)
-  rownames(pheno) <- pheno$donor_id
-  pheno <- pheno[donor_ids, , drop = FALSE]
-
-  fm <- list(X_raw = X, pheno = pheno,
-             feature_names = colnames(X),
-             hallmark_set_sizes = set_sizes)
-  saveRDS(fm, FEATURE_MATRIX_PATH)
-  log_msg("  Saved: ", FEATURE_MATRIX_PATH)
-  }  # close: if (DENOISE_METHOD == "none")
-  }  # close: if (!skip_atlas_block)
+    hl <- lapply(hallmark_list, function(g) intersect(g, rownames(obj)))
+    stopifnot(all(lengths(hl) >= 5))
+    log_msg("AddModuleScore on 50 Hallmark sets (15-25 min)...")
+    obj <- AddModuleScore(obj, features = hl, name = "HM_", nbin = 25, ctrl = 100, seed = 42)
+    score_cols <- paste0("HM_", seq_along(hl))
+    stopifnot(all(score_cols %in% colnames(obj@meta.data)))
+    meta <- obj@meta.data
+    rm(obj); gc()
+    colnames(meta)[match(score_cols, colnames(meta))] <- names(hl)
+    meta <- meta[is_common_celltype(meta$cell_type), ]
+    agg <- meta %>%
+      group_by(donor_id, cell_type) %>%
+      summarise(across(all_of(names(hl)), \(x) mean(x, na.rm = TRUE)), .groups = "drop")
+    first <- meta[!duplicated(meta$donor_id), ]
+    cache <- list(scores = as.data.frame(agg), hallmark_list = hl,
+                  donor = data.frame(donor_id = first$donor_id, condition = first$condition,
+                                     dataset_id = first$dataset_id, stringsAsFactors = FALSE))
+  } else {
+    USE_MODULESCORE <- (DENOISE_METHOD == "limma_modulescore")
+    # Gene pool.
+    #   limma:             HVGs (signal-carrying genes for the simple-mean path).
+    #   limma_modulescore: union of all 50 Hallmark pathway genes. Aligns the gene pool
+    #                      with the feature definition and gives AddModuleScore enough
+    #                      genes for nbin=25 binning (~4000 / 25 ≈ 160 per bin, well
+    #                      above ctrl=100).
+    genes <- if (USE_MODULESCORE) unique(unlist(hallmark_list)) else Seurat::VariableFeatures(obj)
+    genes <- genes[!is_excluded_gene(genes)]
+    genes <- intersect(genes, rownames(obj))
+    stopifnot(!any(grepl("_", genes)))   # a per-cell Seurat object would rename them
+    log_msg("  ", if (USE_MODULESCORE) "Hallmark gene union: " else "HVG set: ", length(genes),
+            " genes (after the gene exclusion, intersected with atlas)")
+    expr <- LayerData(obj, layer = "data")[genes, , drop = FALSE]
+    meta <- obj@meta.data
+    rm(obj); gc()
+    meta <- meta[is_common_celltype(meta$cell_type), ]
+    log_msg("  Atlas cells in 25 common cell types: ", nrow(meta))
+    col_idx <- match(rownames(meta), colnames(expr))
+    stopifnot(!anyNA(col_idx))
+    sums <- list()
+    for (ct in unique(as.character(meta$cell_type))) {
+      sel <- which(meta$cell_type == ct)
+      d <- factor(meta$donor_id[sel], levels = unique(meta$donor_id[sel]))
+      D <- Matrix::sparseMatrix(i = seq_along(d), j = as.integer(d), x = 1,
+                                dims = c(length(d), nlevels(d)))
+      S <- as.matrix(expr[, col_idx[sel], drop = FALSE] %*% D)
+      dimnames(S) <- list(genes, levels(d))
+      first <- sel[match(levels(d), meta$donor_id[sel])]
+      sums[[ct]] <- list(S = S, n = tabulate(as.integer(d), nlevels(d)),
+                         condition = as.character(meta$condition[first]),
+                         dataset = as.character(meta$dataset_id[first]))
+      log_msg("    ", ct, ": ", nlevels(d), " donors, ", length(sel), " cells")
+    }
+    cache <- list(genes = genes, hallmark_list = hallmark_list, sums = sums,
+                  score = if (USE_MODULESCORE) "modulescore" else "mean")
+    rm(expr, meta); gc()
+  }
+  cache$exclusion <- EXCLUSION_KEY
+  saveRDS(cache, CACHE_PATH)
+  log_msg("Saved: ", CACHE_PATH)
 }
 
-X_raw <- fm$X_raw
-pheno <- fm$pheno
-stopifnot(identical(rownames(X_raw), rownames(pheno)))
-log_msg("Feature matrix: ", nrow(X_raw), " donors × ", ncol(X_raw),
-        " features. Conditions: ",
-        paste(names(table(pheno$condition)), table(pheno$condition),
-              sep="=", collapse=", "))
-log_msg("Range of values: [",
-        round(min(X_raw, na.rm=TRUE), 4), ", ",
-        round(max(X_raw, na.rm=TRUE), 4), "]")
-log_msg("NA count: ", sum(is.na(X_raw)),
-        " (", round(100*sum(is.na(X_raw))/length(X_raw), 2), "%)")
+pathways <- names(cache$hallmark_list)
+if (DENOISE_METHOD == "none") {
+  long <- cache$scores %>%
+    pivot_longer(cols = all_of(pathways), names_to = "pathway", values_to = "score") %>%
+    mutate(feature = paste0(pathway, "__", gsub("[-/ ]", "_", cell_type)))
+  wide <- long %>% select(donor_id, feature, score) %>%
+    pivot_wider(names_from = feature, values_from = score)
+  X_fixed <- as.matrix(wide[, -1]); rownames(X_fixed) <- wide$donor_id
+  donors <- sort(rownames(X_fixed)); feats <- colnames(X_fixed)
+  X_fixed <- X_fixed[donors, , drop = FALSE]
+  pheno <- cache$donor[match(donors, cache$donor$donor_id), ]
+  n_genes <- NA_integer_
+} else {
+  # Donor-level feature matrix for one fold: dataset effect fitted on train_donors
+  gene_sets <- lapply(cache$hallmark_list, function(g) intersect(g, cache$genes))
+  gene_sets <- gene_sets[lengths(gene_sets) > 0]
+  cts <- names(cache$sums)
+  feats <- as.vector(t(outer(cts, pathways, function(ct, pw) paste0(pw, "__", gsub("[-/ ]", "_", ct)))))
+  donors <- sort(unique(unlist(lapply(cache$sums, function(s) colnames(s$S)))))
+  pheno <- do.call(rbind, lapply(cache$sums, function(s)
+    data.frame(donor_id = colnames(s$S), condition = s$condition, dataset_id = s$dataset,
+               stringsAsFactors = FALSE)))
+  pheno <- pheno[match(donors, pheno$donor_id), ]
+  n_genes <- length(cache$genes)
+}
+rownames(pheno) <- pheno$donor_id
+
+# Dataset effect per gene (genes × datasets), fitted on the donors in `use` and 0 for a
+# dataset without any of them, whose effect cannot be estimated.
+dataset_effect <- function(s, use) {
+  datasets <- sort(unique(s$dataset))
+  eff <- matrix(0, nrow(s$S), length(datasets), dimnames = list(rownames(s$S), datasets))
+  batch <- factor(s$dataset[use])
+  if (nlevels(batch) < 2) return(eff)
+  contrasts(batch) <- contr.sum(levels(batch))
+  X_batch <- model.matrix(~batch)[, -1, drop = FALSE]
+  cond <- factor(s$condition[use])
+  design <- if (nlevels(cond) > 1) model.matrix(~cond) else matrix(1, length(cond), 1)
+  fit <- lm.wfit(cbind(design, X_batch), t(s$S[, use, drop = FALSE]) / s$n[use], w = s$n[use])
+  beta <- fit$coefficients[-seq_len(ncol(design)), , drop = FALSE]
+  beta[is.na(beta)] <- 0
+  eff[, levels(batch)] <- t(beta) %*% t(contr.sum(levels(batch)))
+  eff
+}
+
+# AddModuleScore's control genes, replayed from the genes' mean expression
+control_genes <- function(avg, gene_sets, nbin = 25, ctrl = 100, seed = 42) {
+  set.seed(seed)
+  avg <- avg[order(avg)]
+  cut <- ggplot2::cut_number(x = avg + rnorm(n = length(avg)) / 1e+30, n = nbin,
+                             labels = FALSE, right = FALSE)
+  names(cut) <- names(avg)
+  lapply(gene_sets, function(f) unique(unlist(lapply(f, function(g)
+    names(sample(x = cut[which(cut == cut[g])], size = ctrl, replace = FALSE))))))
+}
+
+# Donor means of the per-cell scores of one cell type after subtracting `eff`
+donor_scores <- function(s, eff) {
+  shift <- eff[, s$dataset, drop = FALSE]
+  M <- sweep(s$S, 2, s$n, "/") - shift
+  if (cache$score == "modulescore") {
+    avg <- (rowSums(s$S) - drop(shift %*% s$n)) / sum(s$n)
+    ctrl <- control_genes(avg, gene_sets)
+  }
+  sc <- vapply(seq_along(gene_sets), function(i) {
+    v <- colMeans(M[gene_sets[[i]], , drop = FALSE])
+    if (cache$score == "modulescore") v - colMeans(M[ctrl[[i]], , drop = FALSE]) else v
+  }, numeric(ncol(M)))
+  if (!is.matrix(sc)) sc <- matrix(sc, nrow = 1)
+  dimnames(sc) <- list(colnames(s$S), names(gene_sets))
+  sc
+}
+
+fold_features <- function(train_donors) {
+  if (DENOISE_METHOD == "none") return(structure(X_fixed, uncorrected = character(0)))
+  X <- matrix(NA_real_, length(donors), length(feats), dimnames = list(donors, feats))
+  uncorrected <- character(0)
+  for (ct in names(cache$sums)) {
+    s <- cache$sums[[ct]]
+    use <- colnames(s$S) %in% train_donors
+    gone <- setdiff(unique(s$dataset), s$dataset[use])
+    if (length(gone)) uncorrected <- c(uncorrected, paste0(ct, ": ", paste(gone, collapse = ", ")))
+    sc <- donor_scores(s, dataset_effect(s, use))
+    X[rownames(sc), paste0(colnames(sc), "__", gsub("[-/ ]", "_", ct))] <- sc
+  }
+  attr(X, "uncorrected") <- uncorrected
+  X
+}
+
+log_msg("Features: ", length(donors), " donors × ", length(feats), " features. Conditions: ",
+        paste(names(table(pheno$condition)), table(pheno$condition), sep = "=", collapse = ", "))
 
 # =========================================================================
-# Phase 2: Stratified 5×5 CV with three classifiers
+# Phase 2: 5×5 CV, stratified by class and dataset, with three classifiers
 # =========================================================================
 
 # --- helpers --------------------------------------------------------------
-stratified_folds <- function(y, k = 5, repeats = 5, seed = 42) {
+# Folds stratified by class and dataset jointly: donors are ordered by dataset and
+# class, shuffled within each class-by-dataset stratum and dealt to the k folds in
+# turn from a random starting fold. A dataset's donors thus fall into as many folds as
+# it has donors (up to k), so no fold holds out every donor of a dataset with two or
+# more, and every fold keeps the class balance.
+stratified_folds <- function(y, group, k = 5, repeats = 5, seed = 42) {
   set.seed(seed)
+  key <- paste(group, y, sep = "\r")
+  strata <- split(seq_along(y), factor(key, levels = sort(unique(key))))
   folds <- list()
   for (r in seq_len(repeats)) {
-    by_class <- split(seq_along(y), y)
+    ord <- unlist(lapply(strata, function(i) i[sample.int(length(i))]), use.names = FALSE)
     fold_id <- integer(length(y))
-    for (cls in names(by_class)) {
-      idx <- by_class[[cls]]
-      shuf <- sample(idx)
-      fold_id[shuf] <- rep_len(seq_len(k), length(shuf))
-    }
+    fold_id[ord] <- (seq_along(ord) + sample.int(k, 1) - 2) %% k + 1
     for (f in seq_len(k)) {
       folds[[length(folds) + 1]] <- list(
         repeat_id = r, fold_id = f,
@@ -530,8 +463,35 @@ inv_freq <- inv_freq / sum(inv_freq)
 log_msg("Inverse-frequency class weights: ",
         paste(names(inv_freq), round(inv_freq, 3), sep="=", collapse=", "))
 
-folds <- stratified_folds(y, k = 5, repeats = 5, seed = 42)
+folds <- stratified_folds(y, pheno$dataset_id, k = 5, repeats = 5, seed = 42)
 log_msg("CV folds: ", length(folds))
+no_train <- unlist(lapply(folds, function(f)
+  setdiff(unique(pheno$dataset_id), pheno$dataset_id[f$train_idx])))
+if (length(no_train)) stop("A fold has no training donor of dataset(s) ",
+                           paste(unique(no_train), collapse = ", "), call. = FALSE)
+log_msg("Every fold has training donors of all ", length(unique(pheno$dataset_id)), " datasets")
+
+# Per-fold features: batch correction fitted on each fold's training donors
+log_msg("Building the 25 per-fold feature matrices...")
+X_folds <- lapply(folds, function(f) fold_features(donors[f$train_idx]))
+names(X_folds) <- vapply(folds, function(f) sprintf("rep%d_fold%d", f$repeat_id, f$fold_id), "")
+uncorrected <- do.call(rbind, lapply(names(X_folds), function(nm) {
+  u <- attr(X_folds[[nm]], "uncorrected")
+  if (length(u)) data.frame(fold = nm, cell_type_dataset = u) }))
+if (is.null(uncorrected)) {
+  log_msg("Every cell type had training donors of every dataset in every fold")
+} else {
+  log_msg("Cell type × dataset pairs without training donors in a fold (left uncorrected): ",
+          nrow(uncorrected), " - ", paste(uncorrected$fold, uncorrected$cell_type_dataset, collapse = "; "))
+}
+X_folds <- lapply(X_folds, function(X) { attr(X, "uncorrected") <- NULL; X })
+X1 <- X_folds[[1]]
+log_msg("NA count (donors without cells of a cell type): ", sum(is.na(X1)),
+        " (", round(100 * sum(is.na(X1)) / length(X1), 2), "%)")
+fm <- list(X_folds = X_folds, pheno = pheno, feature_names = feats, folds = folds,
+           uncorrected = uncorrected, n_genes = n_genes)
+saveRDS(fm, FEATURE_MATRIX_PATH)
+log_msg("Saved: ", FEATURE_MATRIX_PATH)
 
 FOLD_MODELS_DIR <- file.path(OUTDIR, "fold_models")
 dir.create(FOLD_MODELS_DIR, recursive = TRUE, showWarnings = FALSE)
@@ -550,8 +510,9 @@ for (mname in names(models)) {
   per_fold_metrics <- list()
   for (f_idx in seq_along(folds)) {
     f <- folds[[f_idx]]
-    X_tr <- X_raw[f$train_idx, , drop = FALSE]
-    X_te <- X_raw[f$test_idx,  , drop = FALSE]
+    X_tr <- X_folds[[f_idx]][f$train_idx, , drop = FALSE]
+    X_te <- X_folds[[f_idx]][f$test_idx,  , drop = FALSE]
+    X_test_raw <- X_te
     y_tr <- y[f$train_idx]; y_te <- y[f$test_idx]
 
     pp <- fit_preproc(X_tr)
@@ -563,7 +524,7 @@ for (mname in names(models)) {
       list(model = model, pp = pp,
            train_idx = f$train_idx, test_idx = f$test_idx,
            donor_ids_test = rownames(X_te),
-           y_test = as.character(y_te)),
+           y_test = as.character(y_te), X_test_raw = X_test_raw),
       file.path(FOLD_MODELS_DIR,
                 sprintf("%s_rep%d_fold%d.rds", mname, f$repeat_id, f$fold_id)))
     probs <- models[[mname]]$pred(model, X_te)

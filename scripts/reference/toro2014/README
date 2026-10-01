@@ -1,0 +1,30 @@
+Toro-Dominguez et al. 2014 shared SLE/RA/SjS signature: inputs of scripts/06b_toro_comparison.R
+
+Source:  Toro-Dominguez D, Carmona-Saez P, Alarcon-Riquelme ME. Shared signatures between
+         rheumatoid arthritis, systemic lupus erythematosus and Sjogren's syndrome uncovered
+         through gene expression meta-analysis. Arthritis Res Ther 16, 489 (2014).
+         doi:10.1186/s13075-014-0489-x (open access, CC BY). Additional file 1,
+         13075_2014_489_MOESM1_ESM.xlsx (md5 1d351229342904715db96424f066c573), from
+         https://static-content.springer.com/esm/art%3A10.1186%2Fs13075-014-0489-x/MediaObjects/13075_2014_489_MOESM1_ESM.xlsx
+
+Files (the two .csv files are semicolon-separated with decimal commas, exported in April 2026):
+  toro2014_signature.csv   sheet "GENE EXPRESSION SIGNATURE": 210 over-expressed and 202
+                           under-expressed genes with combined effect size and P value; an
+                           asterisk marks the 41 genes not changed in all three diseases, which
+                           06b drops, leaving the 371-gene shared signature (188 up, 183 down).
+                           SEP15 is kept as text (Excel had turned it into a date).
+  toro2014_go_terms.tsv    sheet "GO Analysis": all 115 GO biological-process terms (94 for the
+                           over-expressed and 21 for the under-expressed genes) with their gene
+                           count, hypergeometric P value and genes, exported on 2026-10-01
+                           (tab-separated). 06b uses the 68 terms with P < 0.01 (53 up, 15 down),
+                           the terms the original study reports as enriched. Three defects of
+                           the sheet are corrected: "KPNB1PSMC2" and "BUB1UBE2C" are split into
+                           KPNB1, PSMC2 and BUB1, UBE2C, and "HF17" in GO:0006355 is read as
+                           PHF17 (a signature gene; HF17 is not a gene symbol). GO:0000209
+                           (protein polyubiquitination) lists 7 genes for a count of 8; it is
+                           kept as listed.
+  toro2014_gain_genes.csv  sheet "Gain and Loss genes", gain block: the 132 genes found only by
+                           the meta-analysis, not in any single dataset.
+
+06b maps every symbol onto the HGNC reference with harmonise_symbols() (scripts/00_config.R)
+before comparing it with the atlas genes.

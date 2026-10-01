@@ -39,6 +39,14 @@ stopifnot(all(need %in% colnames(x@meta.data)))
 keep <- rownames(x@meta.data)[!is.na(x@meta.data$cell_type_pruned)]
 x <- subset(x, cells = keep)
 
+# One sample per donor (FIRST_VISIT_ONLY in 00_config.R): a donor's later visits would
+# otherwise be summed into the same profile below.
+x <- keep_first_visit(x, ACC)
+
+# Gene names onto the HGNC reference (harmonise_genes() in 00_utils.R), so that the datasets of
+# a disease share one namespace when 06 combines them.
+x <- harmonise_genes(x, ACC, BASE)
+
 x$pb_id <- paste(x$donor_id, x$condition, x$cell_type_pruned, sep = "__")
 
 # Seurat v5: layers already joined by safe_join_layers above; use LayerData.

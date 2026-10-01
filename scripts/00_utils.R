@@ -219,6 +219,8 @@ load_msigdb_hallmark <- function(path) {
   }
 
   h <- msig[msig$gs_collection == "H", c("gs_name", "db_gene_symbol")]
+  # the same HGNC namespace as the harmonised datasets (harmonise_symbols() in 00_config.R)
+  h$db_gene_symbol <- harmonise_symbols(h$db_gene_symbol)
   sets <- lapply(split(h$db_gene_symbol, h$gs_name), unique)
   if (length(sets) != 50L) {
     stop("MSigDB cache ", path, " yields ", length(sets), " Hallmark sets, not 50", call. = FALSE)
@@ -244,6 +246,122 @@ ensure_metadata <- function(seu, accession = ACCESSION) {
   if (!"batch_id" %in% colnames(seu@meta.data)) seu$batch_id <- seu$sample_id
   if (!"dataset_id" %in% colnames(seu@meta.data)) seu$dataset_id <- accession
   seu
+}
+
+# --- One sample per donor ---
+
+#' The first visit of each Perez patient, from cell- or sample-level metadata carrying
+#' donor_id, sample_uuid, disease_state and Processing_Cohort. A sample profiled in
+#' several batches is placed by its first, a stable (managed) visit is placed by its
+#' batch against the flare, and a flare precedes its post-treatment sample.
+#'
+#' @return One row per sample (donor, sample, state, batch, rank) with `kept`
+perez_first_visit <- function(meta) {
+  s <- unique(data.frame(donor = as.character(meta$donor_id), sample = as.character(meta$sample_uuid),
+                         state = as.character(meta$disease_state),
+                         batch = as.numeric(as.character(meta$Processing_Cohort)),
+                         stringsAsFactors = FALSE))
+  s <- aggregate(batch ~ donor + sample + state, s, min)
+  s$rank <- s$batch * 10 + match(s$state, c("managed", "flare", "treated", "na"))
+  s$kept <- s$rank == ave(s$rank, s$donor, FUN = min)
+  if (any(tapply(s$kept, s$donor, sum) != 1)) stop("perez_first_visit: a patient does not have exactly one first visit")
+  s
+}
+
+#' Keep each donor's first visit in a dataset listed in FIRST_VISIT_ONLY (00_config.R).
+#' Any other dataset is returned unchanged.
+keep_first_visit <- function(seu, accession) {
+  if (!accession %in% FIRST_VISIT_ONLY) return(seu)
+  fv <- perez_first_visit(seu@meta.data)
+  keep <- as.character(seu$sample_uuid) %in% fv$sample[fv$kept]
+  log_msg("First visit only for ", accession, ": ", sum(!fv$kept), " later samples of ",
+          length(unique(fv$donor[!fv$kept])), " donors dropped, ", sum(!keep), " of ",
+          length(keep), " cells")
+  subset(seu, cells = colnames(seu)[keep])
+}
+
+# --- Gene symbol harmonisation ---
+
+#' The feature file a dataset was read from (scripts/01_qc_preproc.R), with the row name
+#' each feature received: Seurat made repeated symbols unique (".1") and turned underscores
+#' into dashes. Ensembl gene IDs are kept where the dataset deposits them (first column).
+dataset_feature_table <- function(acc_dir) {
+  raw <- file.path(acc_dir, "raw")
+  cands <- c(file.path(raw, "converted_10x", "features.tsv.gz"), file.path(raw, "10x", "features.tsv"),
+             sort(Sys.glob(file.path(raw, "extracted", "*_features.tsv.gz"))),
+             sort(Sys.glob(file.path(raw, "extracted", "*_genes.tsv.gz"))))
+  f <- cands[file.exists(cands)][1]
+  if (is.na(f)) stop("No feature file found under ", raw, call. = FALSE)
+  ft <- utils::read.delim(f, header = FALSE, colClasses = "character", quote = "")
+  id <- sub("\\.[0-9]+$", "", ft[[1]])
+  has_ensembl <- mean(grepl("^ENSG[0-9]{11}$", id)) > 0.9
+  data.frame(row = gsub("_", "-", make.unique(ft[[2]])), symbol = ft[[2]],
+             ensembl = if (has_ensembl) id else NA_character_,
+             file = f, stringsAsFactors = FALSE)
+}
+
+#' Map a per-dataset Seurat object's genes onto the HGNC reference (00_config.R):
+#'   1. Ensembl gene ID -> HGNC approved symbol, where the dataset deposits IDs;
+#'   2. otherwise, or when HGNC does not list the ID, the symbol by approved symbol, then a
+#'      previous symbol, then an alias, each only when it names exactly one approved entry;
+#'   3. unmapped features keep their Ensembl ID as name, or their own name without an ID;
+#'   4. a feature excluded under its own name (is_excluded_gene) keeps that name when its
+#'      HGNC symbol is not itself excluded, so no excluded gene re-enters the analysis.
+#' Rows reaching the same symbol are summed (many-to-one); ambiguous symbols are never mapped
+#' (one-to-many). The full map and its summary are written to results/gene_harmonisation/.
+#' Only the counts and cell metadata are kept: QC and annotation are untouched, and 03 and
+#' 04a normalise from counts.
+harmonise_genes <- function(obj, acc, acc_dir,
+                            out_dir = file.path(ATLAS_ROOT, "results", "gene_harmonisation")) {
+  obj <- safe_join_layers(obj)
+  ft <- dataset_feature_table(acc_dir)
+  rn <- rownames(obj)
+  idx <- match(rn, ft$row)
+  if (anyNA(idx)) stop(acc, ": ", sum(is.na(idx)), " genes of the object are not in ", ft$file[1],
+                       " (e.g. ", paste(head(rn[is.na(idx)], 3), collapse = ", "), ")", call. = FALSE)
+  ens <- ft$ensembl[idx]; sym <- ft$symbol[idx]
+  H <- hgnc_table()
+  target <- unname(H$ensembl[ens]); how <- ifelse(is.na(target), "unmapped", "ensembl")
+  sm <- hgnc_map_symbols(sym)
+  j <- is.na(target) & !is.na(sm$target)
+  target[j] <- sm$target[j]; how[j] <- sm$how[j]
+  u <- is.na(target)
+  target[u] <- ifelse(is.na(ens[u]), rn[u], ens[u])
+  keep <- is_excluded_gene(rn) & !is_excluded_gene(target)
+  target[keep] <- rn[keep]; how[keep] <- paste0(how[keep], "; kept excluded name")
+  many <- target %in% target[duplicated(target)]
+
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+  map <- data.frame(row = rn, symbol = sym, ensembl = ens, hgnc_symbol = target, how = how,
+                    summed = many, stringsAsFactors = FALSE)
+  utils::write.table(map, file.path(out_dir, paste0(acc, "_gene_map.tsv")), sep = "\t",
+                     quote = FALSE, row.names = FALSE, na = "")
+  tab <- table(sub(";.*", "", how))
+  log_msg("Gene harmonisation ", acc, " (", ft$file[1], "): ", nrow(map), " genes; ",
+          paste(names(tab), tab, sep = " ", collapse = ", "), "; renamed ", sum(target != rn),
+          "; excluded names kept ", sum(keep), "; ", sum(many), " rows summed into ",
+          length(unique(target[many])), " genes; ", length(unique(target)), " genes after")
+
+  counts <- SeuratObject::LayerData(obj, assay = "RNA", layer = "counts")
+  if (any(many)) {
+    single <- counts[!many, , drop = FALSE]
+    rownames(single) <- target[!many]
+    f <- factor(target[many])
+    A <- Matrix::sparseMatrix(i = as.integer(f), j = seq_along(f), x = 1,
+                              dims = c(nlevels(f), length(f)))
+    agg <- A %*% counts[many, , drop = FALSE]
+    rownames(agg) <- levels(f)
+    counts <- rbind(single, agg)
+    rm(single, agg)
+  } else {
+    rownames(counts) <- target
+  }
+  meta <- obj@meta.data
+  rm(obj); gc(verbose = FALSE)
+  out <- SeuratObject::CreateSeuratObject(counts = methods::as(counts, "CsparseMatrix"),
+                                          meta.data = meta, min.cells = 0, min.features = 0)
+  stopifnot(identical(colnames(out), rownames(meta)))
+  out
 }
 
 # --- Percent feature set ---
