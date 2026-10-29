@@ -1,0 +1,6 @@
+./atlas-2026.10.freeze.txt
+./atlas-2026.10b.freeze.txt
+./atlas-2026.10c.freeze.txt
+./atlas-tests
+./pandoc
+./venv

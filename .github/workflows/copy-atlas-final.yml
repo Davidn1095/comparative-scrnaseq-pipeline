@@ -1,0 +1,43 @@
+name: Copy atlas container 2026.10 from research-env (no rebuild)
+
+# One-off move of the published image and SIF from ghcr.io/davidn1095/research-env to this repository's package.
+# crane copies the manifests and blobs byte for byte, so the image digest and the SIF sha256 (the digest of the SIF
+# tag's single layer) stay as they were; the last step checks both. Started by hand only.
+on:
+  workflow_dispatch:
+
+env:
+  SOURCE: ghcr.io/davidn1095/research-env
+  TARGET: ghcr.io/davidn1095/comparative-scrnaseq-pipeline
+  IMAGE_TAG: atlas-final-2026.10
+  IMAGE_DIGEST: sha256:09bbfeca81f191614ebc0a644847aea0a27f9b3f59ec9992bbe18a538359d213
+  SIF_TAG: atlas-final-2026.10-sif
+  SIF_SHA256: c7f26ae98de80940c7e4d4565c0a4e60d54344172aa0b877e631d9e7ca4cf89a
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Install crane
+        uses: imjasonh/setup-crane@v0.4
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | crane auth login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Copy the image (by digest) and the SIF
+        run: |
+          crane copy "${SOURCE}@${IMAGE_DIGEST}" "${TARGET}:${IMAGE_TAG}"
+          crane copy "${SOURCE}:${SIF_TAG}" "${TARGET}:${SIF_TAG}"
+
+      - name: Check the digest and the SIF sha256 are unchanged
+        run: |
+          d=$(crane digest "${TARGET}:${IMAGE_TAG}"); echo "image ${TARGET}:${IMAGE_TAG} ${d}"
+          [ "$d" = "${IMAGE_DIGEST}" ]
+          [ "$(crane digest "${TARGET}:${SIF_TAG}")" = "$(crane digest "${SOURCE}:${SIF_TAG}")" ]
+          s=$(crane manifest "${TARGET}:${SIF_TAG}" | python3 -c 'import sys,json; m=json.load(sys.stdin); assert len(m["layers"])==1; print(m["layers"][0]["digest"])')
+          echo "SIF layer ${s}"
+          [ "$s" = "sha256:${SIF_SHA256}" ]

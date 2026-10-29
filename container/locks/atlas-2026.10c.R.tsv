@@ -1,0 +1,385 @@
+Package	Version	LibPath	Priority	Repository	RemoteSha
+base	4.6.1	/usr/local/lib/R/library	base		
+boot	1.3-32	/usr/local/lib/R/library	recommended	CRAN	
+class	7.3-24	/usr/local/lib/R/library	recommended	RSPM	
+cluster	2.1.8.3	/usr/local/lib/R/library	recommended	RSPM	
+codetools	0.2-20	/usr/local/lib/R/library	recommended	CRAN	
+compiler	4.6.1	/usr/local/lib/R/library	base		
+datasets	4.6.1	/usr/local/lib/R/library	base		
+foreign	0.8-91	/usr/local/lib/R/library	recommended	CRAN	
+graphics	4.6.1	/usr/local/lib/R/library	base		
+grDevices	4.6.1	/usr/local/lib/R/library	base		
+grid	4.6.1	/usr/local/lib/R/library	base		
+KernSmooth	2.23-26	/usr/local/lib/R/library	recommended	CRAN	
+lattice	0.22-9	/usr/local/lib/R/library	recommended	CRAN	
+MASS	7.3-66	/usr/local/lib/R/library	recommended	RSPM	
+Matrix	1.7-6	/usr/local/lib/R/library	recommended	RSPM	
+methods	4.6.1	/usr/local/lib/R/library	base		
+mgcv	1.9-4	/usr/local/lib/R/library	recommended	CRAN	
+nlme	3.1-170	/usr/local/lib/R/library	recommended	RSPM	
+nnet	7.3-21	/usr/local/lib/R/library	recommended	RSPM	
+parallel	4.6.1	/usr/local/lib/R/library	base		
+rpart	4.1.27	/usr/local/lib/R/library	recommended	CRAN	
+spatial	7.3-19	/usr/local/lib/R/library	recommended	RSPM	
+splines	4.6.1	/usr/local/lib/R/library	base		
+stats	4.6.1	/usr/local/lib/R/library	base		
+stats4	4.6.1	/usr/local/lib/R/library	base		
+survival	3.8-9	/usr/local/lib/R/library	recommended	RSPM	
+tcltk	4.6.1	/usr/local/lib/R/library	base		
+tools	4.6.1	/usr/local/lib/R/library	base		
+utils	4.6.1	/usr/local/lib/R/library	base		
+abind	1.4-8	/usr/local/lib/R/site-library		RSPM	
+aisdk	1.4.12	/usr/local/lib/R/site-library		RSPM	
+alabaster.base	1.12.1	/usr/local/lib/R/site-library		Bioconductor 3.23	
+alabaster.matrix	1.12.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+alabaster.ranges	1.12.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+alabaster.schemas	1.12.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+alabaster.se	1.12.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+AnnotationDbi	1.74.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+AnnotationHub	4.2.2	/usr/local/lib/R/site-library		Bioconductor 3.23	
+ape	5.8-1	/usr/local/lib/R/site-library		RSPM	
+aplot	0.3.2	/usr/local/lib/R/site-library		RSPM	
+askpass	1.2.1	/usr/local/lib/R/site-library		RSPM	
+assertthat	0.2.1	/usr/local/lib/R/site-library		RSPM	
+assorthead	1.6.4	/usr/local/lib/R/site-library		Bioconductor 3.23	
+babelgene	22.9	/usr/local/lib/R/site-library		RSPM	
+backports	1.5.1	/usr/local/lib/R/site-library		RSPM	
+base64enc	0.1-6	/usr/local/lib/R/site-library		RSPM	
+beachmat	2.28.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+beeswarm	0.4.0	/usr/local/lib/R/site-library		RSPM	
+BH	1.90.0-1	/usr/local/lib/R/site-library		RSPM	
+Biobase	2.72.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+BiocBaseUtils	1.14.2	/usr/local/lib/R/site-library		Bioconductor 3.23	
+BiocFileCache	3.2.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+BiocGenerics	0.58.1	/usr/local/lib/R/site-library		Bioconductor 3.23	
+BiocIO	1.22.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+biocmake	1.4.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+BiocManager	1.30.27	/usr/local/lib/R/site-library		CRAN	
+BiocNeighbors	2.6.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+BiocParallel	1.46.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+BiocSingular	1.28.1	/usr/local/lib/R/site-library		Bioconductor 3.23	
+BiocVersion	3.23.1	/usr/local/lib/R/site-library		Bioconductor 3.23	
+Biostrings	2.80.2	/usr/local/lib/R/site-library		Bioconductor 3.23	
+bit	4.6.0	/usr/local/lib/R/site-library		RSPM	
+bit64	4.8.6	/usr/local/lib/R/site-library		RSPM	
+bitops	1.1-0	/usr/local/lib/R/site-library		RSPM	
+blob	1.3.0	/usr/local/lib/R/site-library		RSPM	
+bluster	1.22.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+brew	1.0-10	/usr/local/lib/R/site-library		RSPM	
+brio	1.1.5	/usr/local/lib/R/site-library		RSPM	
+bslib	0.12.0	/usr/local/lib/R/site-library		RSPM	
+cachem	1.1.0	/usr/local/lib/R/site-library		RSPM	
+Cairo	1.7-0	/usr/local/lib/R/site-library		RSPM	
+callr	3.8.0	/usr/local/lib/R/site-library		RSPM	
+caTools	1.18.4	/usr/local/lib/R/site-library		RSPM	
+celda	1.28.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+celldex	1.22.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+checkmate	2.3.4	/usr/local/lib/R/site-library		RSPM	
+cigarillo	1.2.1	/usr/local/lib/R/site-library		Bioconductor 3.23	
+circlize	0.4.18	/usr/local/lib/R/site-library		RSPM	
+cli	3.6.6	/usr/local/lib/R/site-library		RSPM	
+clipr	0.8.1	/usr/local/lib/R/site-library		RSPM	
+clue	0.3-68	/usr/local/lib/R/site-library		RSPM	
+clusterProfiler	4.20.3	/usr/local/lib/R/site-library		Bioconductor 3.23	
+colorspace	2.1-4	/usr/local/lib/R/site-library		RSPM	
+combinat	0.0-9	/usr/local/lib/R/site-library		RSPM	
+commonmark	2.0.0	/usr/local/lib/R/site-library		RSPM	
+ComplexHeatmap	2.28.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+cowplot	1.2.0	/usr/local/lib/R/site-library		RSPM	
+cpp11	0.5.5	/usr/local/lib/R/site-library		RSPM	
+crayon	1.5.3	/usr/local/lib/R/site-library		RSPM	
+credentials	2.0.3	/usr/local/lib/R/site-library		RSPM	
+crosstalk	1.2.2	/usr/local/lib/R/site-library		RSPM	
+curl	7.1.0	/usr/local/lib/R/site-library		RSPM	
+data.table	1.18.6.1	/usr/local/lib/R/site-library		RSPM	
+DBI	1.3.0	/usr/local/lib/R/site-library		RSPM	
+dbplyr	2.6.0	/usr/local/lib/R/site-library		RSPM	
+dbscan	1.2.7	/usr/local/lib/R/site-library		RSPM	
+decontX	1.10.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+DelayedArray	0.38.2	/usr/local/lib/R/site-library		Bioconductor 3.23	
+DelayedMatrixStats	1.34.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+deldir	2.0-4	/usr/local/lib/R/site-library		RSPM	
+dendextend	1.19.1	/usr/local/lib/R/site-library		RSPM	
+desc	1.4.3	/usr/local/lib/R/site-library		RSPM	
+DESeq2	1.52.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+devtools	2.5.2	/usr/local/lib/R/site-library		RSPM	
+diffobj	0.3.8	/usr/local/lib/R/site-library		RSPM	
+digest	0.6.39	/usr/local/lib/R/site-library		RSPM	
+dir.expiry	1.20.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+distributional	0.9.0	/usr/local/lib/R/site-library		RSPM	
+docopt	0.7.2	/usr/local/lib/R/site-library		RSPM	
+doParallel	1.0.17	/usr/local/lib/R/site-library		RSPM	
+DOSE	4.6.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+dotCall64	1.2	/usr/local/lib/R/site-library		RSPM	
+downlit	0.4.5	/usr/local/lib/R/site-library		RSPM	
+dplyr	1.2.1	/usr/local/lib/R/site-library		RSPM	
+dqrng	0.4.1	/usr/local/lib/R/site-library		RSPM	
+edgeR	4.10.7	/usr/local/lib/R/site-library		Bioconductor 3.23	
+ellipsis	0.3.3	/usr/local/lib/R/site-library		RSPM	
+enrichit	0.2.6	/usr/local/lib/R/site-library		RSPM	
+enrichplot	1.32.1	/usr/local/lib/R/site-library		Bioconductor 3.23	
+enrichR	3.4	/usr/local/lib/R/site-library		RSPM	
+evaluate	1.0.5	/usr/local/lib/R/site-library		RSPM	
+ExperimentHub	3.2.2	/usr/local/lib/R/site-library		Bioconductor 3.23	
+fansi	1.0.7	/usr/local/lib/R/site-library		RSPM	
+farver	2.1.2	/usr/local/lib/R/site-library		RSPM	
+fastDummies	1.7.6	/usr/local/lib/R/site-library		RSPM	
+fastmap	1.2.0	/usr/local/lib/R/site-library		RSPM	
+fastmatch	1.1-8	/usr/local/lib/R/site-library		RSPM	
+fgsea	1.38.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+filelock	1.0.3	/usr/local/lib/R/site-library		RSPM	
+fitdistrplus	1.2-6	/usr/local/lib/R/site-library		RSPM	
+FNN	1.1.4.1	/usr/local/lib/R/site-library		RSPM	
+fontawesome	0.5.3	/usr/local/lib/R/site-library		RSPM	
+fontBitstreamVera	0.1.1	/usr/local/lib/R/site-library		RSPM	
+fontLiberation	0.1.0	/usr/local/lib/R/site-library		RSPM	
+fontquiver	0.2.1	/usr/local/lib/R/site-library		RSPM	
+foreach	1.5.2	/usr/local/lib/R/site-library		RSPM	
+formatR	1.14	/usr/local/lib/R/site-library		RSPM	
+fs	2.1.0	/usr/local/lib/R/site-library		RSPM	
+futile.logger	1.4.9	/usr/local/lib/R/site-library		RSPM	
+futile.options	1.0.1	/usr/local/lib/R/site-library		RSPM	
+future	1.80.0	/usr/local/lib/R/site-library		RSPM	
+future.apply	1.21.0	/usr/local/lib/R/site-library		RSPM	
+gdtools	0.5.2	/usr/local/lib/R/site-library		RSPM	
+generics	0.1.4	/usr/local/lib/R/site-library		RSPM	
+GenomeInfoDb	1.48.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+GenomicAlignments	1.48.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+GenomicRanges	1.64.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+gert	2.4.0	/usr/local/lib/R/site-library		RSPM	
+GetoptLong	1.1.1	/usr/local/lib/R/site-library		RSPM	
+ggbeeswarm	0.7.3	/usr/local/lib/R/site-library		RSPM	
+ggchicklet	0.6.0	/usr/local/lib/R/site-library			64c468dd0900153be1690dbfc5cfb35710da8183
+ggdendro	0.2.0	/usr/local/lib/R/site-library		RSPM	
+ggforce	0.5.0	/usr/local/lib/R/site-library		RSPM	
+ggfun	0.2.2	/usr/local/lib/R/site-library		RSPM	
+ggiraph	0.9.6	/usr/local/lib/R/site-library		RSPM	
+ggnewscale	0.5.2	/usr/local/lib/R/site-library		RSPM	
+ggplot2	4.0.3	/usr/local/lib/R/site-library		RSPM	
+ggplotify	0.1.4	/usr/local/lib/R/site-library		RSPM	
+ggrastr	1.0.2	/usr/local/lib/R/site-library		RSPM	
+ggrepel	0.9.8	/usr/local/lib/R/site-library		RSPM	
+ggridges	0.5.7	/usr/local/lib/R/site-library		RSPM	
+ggtangle	0.1.4	/usr/local/lib/R/site-library		RSPM	
+ggtree	4.2.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+gh	1.6.1	/usr/local/lib/R/site-library		RSPM	
+gitcreds	0.1.2	/usr/local/lib/R/site-library		RSPM	
+glmnet	5.1	/usr/local/lib/R/site-library		RSPM	
+GlobalOptions	0.1.4	/usr/local/lib/R/site-library		RSPM	
+globals	0.20.0	/usr/local/lib/R/site-library		RSPM	
+glue	1.8.1	/usr/local/lib/R/site-library		RSPM	
+GO.db	3.23.1	/usr/local/lib/R/site-library			
+goftest	1.2-3	/usr/local/lib/R/site-library		RSPM	
+GOSemSim	2.38.3	/usr/local/lib/R/site-library		Bioconductor 3.23	
+gplots	3.3.0	/usr/local/lib/R/site-library		RSPM	
+gridExtra	2.3.1	/usr/local/lib/R/site-library		RSPM	
+gridGraphics	0.5-1	/usr/local/lib/R/site-library		RSPM	
+gson	0.2.2	/usr/local/lib/R/site-library		RSPM	
+gtable	0.3.6	/usr/local/lib/R/site-library		RSPM	
+gtools	3.9.5	/usr/local/lib/R/site-library		RSPM	
+gypsum	1.8.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+h5mread	1.4.1	/usr/local/lib/R/site-library		Bioconductor 3.23	
+HDF5Array	1.40.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+hdf5r	1.3.16	/usr/local/lib/R/site-library		RSPM	
+here	1.0.2	/usr/local/lib/R/site-library		RSPM	
+highr	0.12	/usr/local/lib/R/site-library		RSPM	
+hms	1.1.4	/usr/local/lib/R/site-library		RSPM	
+htmltools	0.5.9	/usr/local/lib/R/site-library		RSPM	
+htmlwidgets	1.6.4	/usr/local/lib/R/site-library		RSPM	
+httpuv	1.6.17	/usr/local/lib/R/site-library		RSPM	
+httr	1.4.9	/usr/local/lib/R/site-library		RSPM	
+httr2	1.3.0	/usr/local/lib/R/site-library		RSPM	
+ica	1.0-3	/usr/local/lib/R/site-library		RSPM	
+igraph	2.3.4	/usr/local/lib/R/site-library		RSPM	
+ini	0.3.1	/usr/local/lib/R/site-library		RSPM	
+inline	0.3.21	/usr/local/lib/R/site-library		RSPM	
+IRanges	2.46.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+irlba	2.4.1	/usr/local/lib/R/site-library		RSPM	
+isoband	0.3.0	/usr/local/lib/R/site-library		RSPM	
+iterators	1.0.14	/usr/local/lib/R/site-library		RSPM	
+jquerylib	0.1.4	/usr/local/lib/R/site-library		RSPM	
+jsonlite	2.0.0	/usr/local/lib/R/site-library		RSPM	
+jsonvalidate	1.5.0	/usr/local/lib/R/site-library		RSPM	
+KEGGREST	1.52.2	/usr/local/lib/R/site-library		Bioconductor 3.23	
+knitr	1.51	/usr/local/lib/R/site-library		RSPM	
+labeling	0.4.3	/usr/local/lib/R/site-library		RSPM	
+lambda.r	1.2.6	/usr/local/lib/R/site-library		RSPM	
+later	1.4.8	/usr/local/lib/R/site-library		RSPM	
+lazyeval	0.2.3	/usr/local/lib/R/site-library		RSPM	
+lifecycle	1.0.5	/usr/local/lib/R/site-library		RSPM	
+limma	3.68.5	/usr/local/lib/R/site-library		Bioconductor 3.23	
+listenv	1.1.0	/usr/local/lib/R/site-library		RSPM	
+littler	0.3.23	/usr/local/lib/R/site-library		RSPM	
+lmtest	0.9-40	/usr/local/lib/R/site-library		RSPM	
+locfit	1.5-9.12	/usr/local/lib/R/site-library		RSPM	
+loo	2.10.1	/usr/local/lib/R/site-library		RSPM	
+magick	2.9.1	/usr/local/lib/R/site-library		RSPM	
+magrittr	2.0.5	/usr/local/lib/R/site-library		RSPM	
+MatrixGenerics	1.24.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+matrixStats	1.5.0	/usr/local/lib/R/site-library		RSPM	
+MCMCprecision	0.4.2	/usr/local/lib/R/site-library		RSPM	
+memoise	2.0.1	/usr/local/lib/R/site-library		RSPM	
+metapod	1.20.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+mime	0.13	/usr/local/lib/R/site-library		RSPM	
+miniUI	0.1.2	/usr/local/lib/R/site-library		RSPM	
+msigdbr	26.1.1	/usr/local/lib/R/site-library		RSPM	
+numDeriv	2016.8-1.1	/usr/local/lib/R/site-library		RSPM	
+openssl	2.4.2	/usr/local/lib/R/site-library		RSPM	
+openxlsx2	1.30	/usr/local/lib/R/site-library		RSPM	
+org.Hs.eg.db	3.23.1	/usr/local/lib/R/site-library			
+otel	0.2.0	/usr/local/lib/R/site-library		RSPM	
+pak	0.11.1	/usr/local/lib/R/site-library		RSPM	
+parallelly	1.48.0	/usr/local/lib/R/site-library		RSPM	
+patchwork	1.3.2	/usr/local/lib/R/site-library		RSPM	
+pbapply	1.7-5	/usr/local/lib/R/site-library		RSPM	
+pheatmap	1.0.13	/usr/local/lib/R/site-library		RSPM	
+pillar	1.11.1	/usr/local/lib/R/site-library		RSPM	
+pkgbuild	1.4.8	/usr/local/lib/R/site-library		RSPM	
+pkgconfig	2.0.3	/usr/local/lib/R/site-library		RSPM	
+pkgdown	2.2.1	/usr/local/lib/R/site-library		RSPM	
+pkgload	1.5.3	/usr/local/lib/R/site-library		RSPM	
+plotly	4.12.1	/usr/local/lib/R/site-library		RSPM	
+plyr	1.8.9	/usr/local/lib/R/site-library		RSPM	
+png	0.1-9	/usr/local/lib/R/site-library		RSPM	
+polyclip	1.10-7	/usr/local/lib/R/site-library		RSPM	
+posterior	1.7.0	/usr/local/lib/R/site-library		RSPM	
+praise	1.0.0	/usr/local/lib/R/site-library		RSPM	
+preprocessCore	1.74.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+prettyunits	1.2.0	/usr/local/lib/R/site-library		RSPM	
+pROC	1.19.1	/usr/local/lib/R/site-library		RSPM	
+processx	3.9.0	/usr/local/lib/R/site-library		RSPM	
+profvis	0.4.0	/usr/local/lib/R/site-library		RSPM	
+progress	1.2.3	/usr/local/lib/R/site-library		RSPM	
+progressr	1.1.0	/usr/local/lib/R/site-library		RSPM	
+promises	1.5.0	/usr/local/lib/R/site-library		RSPM	
+ps	1.9.3	/usr/local/lib/R/site-library		RSPM	
+purrr	1.2.2	/usr/local/lib/R/site-library		RSPM	
+QuickJSR	1.11.0	/usr/local/lib/R/site-library		RSPM	
+qvalue	2.44.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+R6	2.6.1	/usr/local/lib/R/site-library		RSPM	
+ragg	1.5.2	/usr/local/lib/R/site-library		RSPM	
+ranger	0.18.0	/usr/local/lib/R/site-library		RSPM	
+RANN	2.6.3	/usr/local/lib/R/site-library		RSPM	
+rappdirs	0.3.4	/usr/local/lib/R/site-library		RSPM	
+rcmdcheck	1.4.0	/usr/local/lib/R/site-library		RSPM	
+RColorBrewer	1.1-3	/usr/local/lib/R/site-library		RSPM	
+Rcpp	1.1.2	/usr/local/lib/R/site-library		RSPM	
+RcppAnnoy	0.0.23	/usr/local/lib/R/site-library		RSPM	
+RcppArmadillo	15.6.2-1	/usr/local/lib/R/site-library		RSPM	
+RcppEigen	0.3.4.0.2	/usr/local/lib/R/site-library		RSPM	
+RcppHNSW	0.7.0	/usr/local/lib/R/site-library		RSPM	
+RcppML	0.3.7.1	/usr/local/lib/R/site-library		RSPM	
+RcppParallel	6.2.1	/usr/local/lib/R/site-library		RSPM	
+RcppProgress	0.4.2	/usr/local/lib/R/site-library		RSPM	
+RcppThread	2.4.0	/usr/local/lib/R/site-library		RSPM	
+RcppTOML	0.2.3	/usr/local/lib/R/site-library		RSPM	
+RCurl	1.98-1.20	/usr/local/lib/R/site-library		RSPM	
+rdtools	0.1.0	/usr/local/lib/R/site-library		RSPM	
+readr	2.2.0	/usr/local/lib/R/site-library		RSPM	
+remotes	2.5.0	/usr/local/lib/R/site-library		RSPM	
+reshape2	1.4.5	/usr/local/lib/R/site-library		RSPM	
+restfulr	0.0.17	/usr/local/lib/R/site-library		RSPM	
+reticulate	1.47.0	/usr/local/lib/R/site-library		RSPM	
+rhdf5	2.56.1	/usr/local/lib/R/site-library		Bioconductor 3.23	
+rhdf5filters	1.24.1	/usr/local/lib/R/site-library		Bioconductor 3.23	
+Rhdf5lib	2.0.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+Rhtslib	3.8.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+Rigraphlib	1.4.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+rjson	0.2.23	/usr/local/lib/R/site-library		RSPM	
+rlang	1.3.0	/usr/local/lib/R/site-library		RSPM	
+rmarkdown	2.31	/usr/local/lib/R/site-library		RSPM	
+ROCR	1.0-12	/usr/local/lib/R/site-library		RSPM	
+roxygen2	8.1.0	/usr/local/lib/R/site-library		RSPM	
+rprojroot	2.1.1	/usr/local/lib/R/site-library		RSPM	
+Rsamtools	2.28.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+RSpectra	0.16-2	/usr/local/lib/R/site-library		RSPM	
+RSQLite	3.53.3	/usr/local/lib/R/site-library		RSPM	
+rstan	2.32.7	/usr/local/lib/R/site-library		RSPM	
+rstantools	2.7.1	/usr/local/lib/R/site-library		RSPM	
+rstudioapi	0.19.0	/usr/local/lib/R/site-library		RSPM	
+rsvd	1.0.6	/usr/local/lib/R/site-library		RSPM	
+rtracklayer	1.72.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+Rtsne	0.17	/usr/local/lib/R/site-library		RSPM	
+rversions	3.0.0	/usr/local/lib/R/site-library		RSPM	
+S4Arrays	1.12.1	/usr/local/lib/R/site-library		Bioconductor 3.23	
+S4Vectors	0.50.3	/usr/local/lib/R/site-library		Bioconductor 3.23	
+S7	0.2.2	/usr/local/lib/R/site-library		RSPM	
+sass	0.4.10	/usr/local/lib/R/site-library		RSPM	
+ScaledMatrix	1.20.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+scales	1.4.0	/usr/local/lib/R/site-library		RSPM	
+scater	1.40.2	/usr/local/lib/R/site-library		Bioconductor 3.23	
+scattermore	1.2	/usr/local/lib/R/site-library		RSPM	
+scatterpie	0.2.6	/usr/local/lib/R/site-library		RSPM	
+scDblFinder	1.26.9	/usr/local/lib/R/site-library		Bioconductor 3.23	
+scran	1.40.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+scrapper	1.6.3	/usr/local/lib/R/site-library		Bioconductor 3.23	
+sctransform	0.4.3	/usr/local/lib/R/site-library		RSPM	
+scuttle	1.22.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+Seqinfo	1.2.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+sessioninfo	1.2.4	/usr/local/lib/R/site-library		RSPM	
+Seurat	5.6.0	/usr/local/lib/R/site-library		RSPM	
+SeuratObject	5.4.0	/usr/local/lib/R/site-library		RSPM	
+shape	1.4.6.1	/usr/local/lib/R/site-library		RSPM	
+shiny	1.14.0	/usr/local/lib/R/site-library		RSPM	
+SingleCellExperiment	1.34.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+SingleR	2.14.2	/usr/local/lib/R/site-library		Bioconductor 3.23	
+sitmo	2.0.2	/usr/local/lib/R/site-library		RSPM	
+snow	0.4-4	/usr/local/lib/R/site-library		RSPM	
+sourcetools	0.1.7-2	/usr/local/lib/R/site-library		RSPM	
+sp	2.2-4	/usr/local/lib/R/site-library		RSPM	
+spam	2.11-4	/usr/local/lib/R/site-library		RSPM	
+SparseArray	1.12.3	/usr/local/lib/R/site-library		Bioconductor 3.23	
+sparseMatrixStats	1.24.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+spatstat.data	3.1-9	/usr/local/lib/R/site-library		RSPM	
+spatstat.explore	3.8-3	/usr/local/lib/R/site-library		RSPM	
+spatstat.geom	3.8-3	/usr/local/lib/R/site-library		RSPM	
+spatstat.random	3.5-2	/usr/local/lib/R/site-library		RSPM	
+spatstat.sparse	3.2-0	/usr/local/lib/R/site-library		RSPM	
+spatstat.univar	3.2-0	/usr/local/lib/R/site-library		RSPM	
+spatstat.utils	3.2-5	/usr/local/lib/R/site-library		RSPM	
+StanHeaders	2.39.1	/usr/local/lib/R/site-library		RSPM	
+statmod	1.5.2	/usr/local/lib/R/site-library		RSPM	
+stringi	1.8.9	/usr/local/lib/R/site-library		RSPM	
+stringr	1.6.0	/usr/local/lib/R/site-library		RSPM	
+SummarizedExperiment	1.42.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+sys	3.4.3	/usr/local/lib/R/site-library		RSPM	
+systemfonts	1.3.2	/usr/local/lib/R/site-library		RSPM	
+tensor	1.5.1	/usr/local/lib/R/site-library		RSPM	
+tensorA	0.36.2.1	/usr/local/lib/R/site-library		RSPM	
+testthat	3.3.2	/usr/local/lib/R/site-library		RSPM	
+textshaping	1.0.5	/usr/local/lib/R/site-library		RSPM	
+tibble	3.3.1	/usr/local/lib/R/site-library		RSPM	
+tidydr	0.0.7	/usr/local/lib/R/site-library		RSPM	
+tidyr	1.3.2	/usr/local/lib/R/site-library		RSPM	
+tidyselect	1.2.1	/usr/local/lib/R/site-library		RSPM	
+tidytree	0.4.8	/usr/local/lib/R/site-library		RSPM	
+tinytex	0.60	/usr/local/lib/R/site-library		RSPM	
+treeio	1.36.1	/usr/local/lib/R/site-library		Bioconductor 3.23	
+tweenr	2.0.3	/usr/local/lib/R/site-library		RSPM	
+tzdb	0.5.0	/usr/local/lib/R/site-library		RSPM	
+UCSC.utils	1.8.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+urlchecker	2.0.0	/usr/local/lib/R/site-library		RSPM	
+usethis	3.2.1	/usr/local/lib/R/site-library		RSPM	
+utf8	1.2.6	/usr/local/lib/R/site-library		RSPM	
+uwot	0.2.5	/usr/local/lib/R/site-library		RSPM	
+V8	8.2.0	/usr/local/lib/R/site-library		RSPM	
+vctrs	0.7.3	/usr/local/lib/R/site-library		RSPM	
+vipor	0.4.7	/usr/local/lib/R/site-library		RSPM	
+viridis	0.6.5	/usr/local/lib/R/site-library		RSPM	
+viridisLite	0.4.3	/usr/local/lib/R/site-library		RSPM	
+vroom	1.7.1	/usr/local/lib/R/site-library		RSPM	
+waldo	0.6.2	/usr/local/lib/R/site-library		RSPM	
+whisker	0.4.1	/usr/local/lib/R/site-library		RSPM	
+withr	3.0.3	/usr/local/lib/R/site-library		RSPM	
+WriteXLS	6.8.0	/usr/local/lib/R/site-library		RSPM	
+xfun	0.60	/usr/local/lib/R/site-library		RSPM	
+xgboost	3.2.1.1	/usr/local/lib/R/site-library		RSPM	
+XML	3.99-0.25	/usr/local/lib/R/site-library		RSPM	
+xml2	1.6.0	/usr/local/lib/R/site-library		RSPM	
+xopen	1.0.1	/usr/local/lib/R/site-library		RSPM	
+xtable	1.8-8	/usr/local/lib/R/site-library		RSPM	
+XVector	0.52.0	/usr/local/lib/R/site-library		Bioconductor 3.23	
+yaml	2.3.12	/usr/local/lib/R/site-library		RSPM	
+yulab.utils	0.2.5	/usr/local/lib/R/site-library		RSPM	
+zip	3.0.2	/usr/local/lib/R/site-library		RSPM	
+zoo	1.9-1	/usr/local/lib/R/site-library		RSPM	

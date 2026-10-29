@@ -1,0 +1,9 @@
+*
+!Dockerfile.atlas-final
+!locks/
+!build/atlas_final_install.R
+!tests/atlas_load_test.R
+!tests/atlas_load_test.py
+!tests/atlas_b_load_test.py
+!tests/atlas_c_load_test.py
+!tests/atlas_final_load_test.py

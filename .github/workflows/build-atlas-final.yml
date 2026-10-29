@@ -1,0 +1,54 @@
+name: Build atlas container, final (atlas-final-2026.10)
+
+# Builds container/Dockerfile.atlas-final from scratch (every version pinned; see the Dockerfile header), runs its load test,
+# which checks the versions of atlas-2026.10c plus cellsnp-lite and vireoSNP, and pushes ONLY the atlas-final tag
+# (no :latest). Started by hand only. The published 2026.10 image was built in research-env and copied here
+# unchanged (copy-atlas-final.yml); this workflow is the recipe to rebuild it.
+on:
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: davidn1095/comparative-scrnaseq-pipeline
+  TAG: atlas-final-2026.10
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Free runner disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+          sudo docker image prune --all --force
+          df -h /
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        env:
+          DOCKER_BUILDKIT: "1"
+        run: docker build -f container/Dockerfile.atlas-final -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }} container
+
+      - name: Load test (equality with atlas-2026.10c plus the two tools, earlier tests, genotype smoke test)
+        run: docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }} python /opt/atlas-tests/atlas_final_load_test.py
+
+      - name: Push image (only after the load test passes)
+        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
+
+      - name: Image size and digest
+        run: |
+          docker image ls ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
+          docker inspect --format '{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}

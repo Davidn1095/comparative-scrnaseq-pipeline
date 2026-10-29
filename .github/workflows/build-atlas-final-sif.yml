@@ -1,0 +1,64 @@
+name: Build atlas SIF, final (atlas-final-2026.10-sif)
+
+# Converts the already published, tested image ghcr.io/davidn1095/comparative-scrnaseq-pipeline:atlas-final-2026.10
+# (taken by digest, not rebuilt) into an Apptainer SIF and pushes it to the same package as an ORAS artifact, tag atlas-final-2026.10-sif.
+# The SIF is then fetched with `apptainer pull oras://ghcr.io/davidn1095/comparative-scrnaseq-pipeline:atlas-final-2026.10-sif`,
+# which needs no mksquashfs on the host. The SIF's sha256 is printed and kept as a run artifact.
+# Apptainer 1.5.3, the version used to run the pipeline, from its GitHub release (.deb checked against the release's sha256).
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: "Digest of comparative-scrnaseq-pipeline:atlas-final-2026.10 to convert"
+        required: true
+        default: "sha256:09bbfeca81f191614ebc0a644847aea0a27f9b3f59ec9992bbe18a538359d213"
+
+env:
+  SOURCE: ghcr.io/davidn1095/comparative-scrnaseq-pipeline
+  SIF_TAG: atlas-final-2026.10-sif
+  APPTAINER_VERSION: 1.5.3
+  APPTAINER_DEB_SHA256: 82b0bdddf459087d202383360b8318d526ad6826c748a2f669913cc6aef9ee40
+
+jobs:
+  build-sif-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+          sudo docker image prune --all --force
+          df -h /
+
+      - name: Install Apptainer ${{ env.APPTAINER_VERSION }}
+        run: |
+          curl -sSL -o apptainer.deb "https://github.com/apptainer/apptainer/releases/download/v${APPTAINER_VERSION}/apptainer_${APPTAINER_VERSION}_amd64.deb"
+          echo "${APPTAINER_DEB_SHA256}  apptainer.deb" | sha256sum -c -
+          sudo apt-get update && sudo apt-get install -y ./apptainer.deb
+          apptainer --version
+
+      - name: Build the SIF from the image digest
+        run: |
+          apptainer build atlas-final-2026.10.sif "docker://${SOURCE}@${{ inputs.digest }}"
+          ls -la atlas-final-2026.10.sif
+          sha256sum atlas-final-2026.10.sif | tee atlas-final-2026.10.sif.sha256
+          echo "source image: ${SOURCE}@${{ inputs.digest }}" >> atlas-final-2026.10.sif.sha256
+
+      - name: Check the SIF (versions of the two added tools)
+        run: |
+          apptainer exec atlas-final-2026.10.sif cellsnp-lite --version
+          apptainer exec atlas-final-2026.10.sif python -c "import vireoSNP; print('vireoSNP', vireoSNP.__version__)"
+
+      - name: Push the SIF (ORAS)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | apptainer registry login --username "${{ github.actor }}" --password-stdin oras://ghcr.io
+          apptainer push atlas-final-2026.10.sif "oras://${SOURCE}:${SIF_TAG}"
+
+      - name: Keep the sha256 record
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-final-2026.10-sif-sha256
+          path: atlas-final-2026.10.sif.sha256

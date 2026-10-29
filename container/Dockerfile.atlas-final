@@ -1,0 +1,75 @@
+# Atlas analysis environment, final (autoimmune-atlas, Genes & Immunity revision); tag atlas-final-2026.10.
+# Built from scratch to equal atlas-2026.10c (R 4.6.1, Bioconductor 3.23, Python 3.12) plus cellsnp-lite 1.2.3
+# (htslib 1.24) and vireoSNP 0.5.9, with every version pinned:
+#   base image          by digest (the image atlas-2026.10 was built from, unchanged since 2026-08-11)
+#   Ubuntu packages     Ubuntu snapshot of 2026-10-23 09:00 UTC (atlas-2026.10 was built that morning)
+#   R packages          Posit CRAN snapshot 2026-10-22, Bioconductor 3.23; checked against locks/atlas-2026.10c.R.tsv
+#   Python packages     every version of atlas-2026.10c's pip freeze (locks/atlas-2026.10c.pip.txt), installed without
+#                       dependency resolution; vireoSNP constrained to that freeze
+#   cellsnp-lite        the conda build of cellsnp-lite with its 24 dependencies, by URL and MD5
+#                       (locks/cellsnp.conda-explicit.txt), in its own prefix /opt/cellsnp
+# Locks were exported from atlas-2026.10c on 2026-10-28. tests/atlas_final_load_test.py checks the versions (pip freeze,
+# R installed.packages, dpkg, /opt) before the image is pushed.
+# Built by .github/workflows/build-atlas-final.yml.
+
+# ---------------------------------------------------------------------------- cellsnp-lite (own conda prefix)
+FROM mambaorg/micromamba:2.5.0@sha256:313021a575cb995a45357e26c48e7979cae278267c28e12c2ecac49c35729c8b AS cellsnp
+USER root
+COPY locks/cellsnp.conda-explicit.txt /tmp/cellsnp.conda-explicit.txt
+RUN set -e && micromamba create -y -p /opt/cellsnp --file /tmp/cellsnp.conda-explicit.txt && \
+    micromamba clean -a -y && /opt/cellsnp/bin/cellsnp-lite --version
+
+# ---------------------------------------------------------------------------- the atlas environment
+FROM bioconductor/bioconductor_docker@sha256:821dbf9ac119eac41f177531c7ca8fc7084c99c04eb218a1aa7f52cb63bad5d9
+
+LABEL maintainer="David Nunez"
+LABEL description="autoimmune-atlas analysis environment (final): R 4.6.1, Bioconductor 3.23, Python 3.12, cellsnp-lite 1.2.3, vireoSNP 0.5.9"
+LABEL org.opencontainers.image.source="https://github.com/Davidn1095/comparative-scrnaseq-pipeline"
+LABEL atlas.version="atlas-final-2026.10"
+
+# R_LIBS_USER and PYTHONNOUSERSITE keep host-side libraries out of the search path; R_ENVIRON_USER and
+# R_PROFILE_USER make R ignore ~/.Renviron and ~/.Rprofile of whoever runs the image (HPC systems often mount home in the container).
+ENV LC_ALL=C.UTF-8 \
+    LANG=C.UTF-8 \
+    DEBIAN_FRONTEND=noninteractive \
+    R_LIBS_USER=/opt/r-user-lib-unused \
+    R_ENVIRON_USER=/dev/null \
+    R_PROFILE_USER=/dev/null \
+    PYTHONNOUSERSITE=1 \
+    VIRTUAL_ENV=/opt/venv \
+    RETICULATE_PYTHON=/opt/venv/bin/python
+ENV PATH="/opt/venv/bin:${PATH}"
+
+COPY locks/ /opt/atlas-locks/
+
+# ---------------------------------------------------------------------------- Ubuntu packages (snapshot)
+RUN set -e && apt-get update --snapshot 20261023T090000Z && \
+    apt-get install -y --no-install-recommends --snapshot 20261023T090000Z \
+        python3 python3-venv python3-dev \
+        libhdf5-dev libmagick++-dev libglpk-dev libgsl-dev libfftw3-dev \
+        libgmp-dev libmpfr-dev libbz2-dev cmake libtbb-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------- Python 3.12 virtual environment
+RUN set -e && python3 -m venv /opt/venv && \
+    pip install --no-cache-dir "pip==26.2.2" && \
+    pip install --no-cache-dir --no-deps -r /opt/atlas-locks/atlas-2026.10c.pip.txt && \
+    pip check && \
+    pip install --no-cache-dir -c /opt/atlas-locks/atlas-2026.10c.pip.txt "vireoSNP==0.5.9" && \
+    python -c "import sys; assert sys.version_info[:3] == (3, 12, 3), sys.version"
+
+# ---------------------------------------------------------------------------- R packages
+COPY build/atlas_final_install.R /tmp/atlas_final_install.R
+RUN Rscript /tmp/atlas_final_install.R
+
+# ---------------------------------------------------------------------------- cellsnp-lite, freezes, tests
+COPY --from=cellsnp /opt/cellsnp /opt/cellsnp
+RUN set -e && ln -s /opt/cellsnp/bin/cellsnp-lite /usr/local/bin/cellsnp-lite && \
+    cp /opt/atlas-locks/atlas-2026.10.freeze.txt /opt/atlas-locks/atlas-2026.10b.freeze.txt \
+       /opt/atlas-locks/atlas-2026.10c.freeze.txt /opt/
+COPY tests/atlas_load_test.R tests/atlas_load_test.py tests/atlas_b_load_test.py tests/atlas_c_load_test.py \
+     tests/atlas_final_load_test.py /opt/atlas-tests/
+
+RUN rm -rf /tmp/* /var/tmp/* && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+CMD ["Rscript"]
