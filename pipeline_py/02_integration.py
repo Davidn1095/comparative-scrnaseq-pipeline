@@ -6,7 +6,7 @@
 #   jupyter-book/cellular_structure/clustering.ipynb (last changed 893f34f, 2026-09-29), cells 12 and 15.
 # The notebooks' code cells are copied in order; every changed line carries a "# CHANGED:" comment with the reason.
 # Plot and display cells are left out, as marked. The book has no code for sex inference or gene exclusion: that part is
-# new (donor sex from XIST and chrY genes; mitochondrial and red-cell genes removed) and marked as such.
+# new, and marked as such.
 # Usage: python 02_integration.py   (ATLAS_DATASETS=a,b,c and ATLAS_RUN=<folder> for a subset run, e.g. a code test)
 # Output: $PIPELINE_OUT/py/atlas/02_integration/: atlas.h5ad (all kept genes; layers counts and logcounts; obsm X_pca,
 #   X_umap_unintegrated, X_scVI, X_umap; leiden clusterings), scvi_model/, donor_sex.tsv, confounding.tsv,
@@ -47,7 +47,7 @@ RUN_DATASETS = [d for d in os.environ.get("ATLAS_DATASETS", ",".join(DATASETS.da
 out = OUT_ROOT / "atlas" / os.environ.get("ATLAS_RUN", "02_integration")  # CHANGED: pipeline output
 out.mkdir(parents=True, exist_ok=True)  # CHANGED: as above
 
-# ===== not in the book: sex inference, then gene exclusion, and the merge of the samples =====
+# ===== not in the book: sex inference, then gene exclusion and the merge of the samples =====
 # Reference genes of GRCh38-2024-A with chromosome and position (written by the pipeline from the Cell Ranger GTF)
 genes = pd.read_csv(DEV_ROOT / "reference" / "genes.tsv", sep="\t")
 PAR_Y = [(10001, 2781479), (56887903, 57217415)]  # GRCh38 pseudoautosomal regions of chrY
@@ -110,10 +110,10 @@ for ds in RUN_DATASETS:
 sex = pd.concat(sex_rows)
 sex.round(2).to_csv(out / "donor_sex.tsv", sep="\t", index=False)
 conf = sex.groupby(["dataset", "condition", "inferred_sex"]).size().unstack(fill_value=0).reset_index()
-conf.to_csv(out / "confounding.tsv", sep="\t", index=False)  # check that disease is not confounded with donor sex
+conf.to_csv(out / "confounding.tsv", sep="\t", index=False)  # confounding check (donor sex)
 pd.DataFrame({"gene_id": group.index, "group": group.values}).query("group != ''").merge(
     genes[["gene_id", "gene_name"]]).to_csv(out / "excluded_genes.tsv", sep="\t", index=False)
-# the atlas keeps the genes shared by all datasets (inner join below). Curated markers that some
+# 2026-10-29: the atlas keeps the genes shared by all datasets (inner join below). Curated markers that some
 # dataset did not measure (e.g. IGHM, IGKC, TRDC: the GSE135779 deposit is hg19 without immunoglobulin and T-cell receptor
 # constant genes) are kept apart for annotation (03), with a record of which dataset measured each; unmeasured is not zero
 shared = set.intersection(*[set(a.var_names) for a in parts])

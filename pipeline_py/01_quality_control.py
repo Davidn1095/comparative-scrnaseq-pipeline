@@ -279,7 +279,7 @@ doublet_class <- sce$scDblFinder.class
 # CHANGED: everything below loops the notebook's steps over the dataset's samples and libraries, in three stages:
 #   python 01_quality_control.py <dataset> --stage qc           A: per-cell metrics, MAD flags per sample
 #   python 01_quality_control.py <dataset> --stage library [i]  B: library i (default SLURM_ARRAY_TASK_ID):
-#                                                                   DecontX, expected doublet rate and check, scDblFinder
+#                                                                   DecontX, doublet rate and check, scDblFinder
 #   python 01_quality_control.py <dataset> --stage merge        C: cells.tsv, libraries.tsv, samples/*.h5ad
 #   python 01_quality_control.py <dataset>                      A, B for every library, C, in one process
 # QC needs a sample's cells from every library it was sequenced in (a Perez sample spans 2-16 libraries),
@@ -291,7 +291,7 @@ import shutil  # CHANGED: as above
 ds = sys.argv[1]
 stage = sys.argv[sys.argv.index("--stage") + 1] if "--stage" in sys.argv else "all"  # CHANGED: staged run
 mode = DATASETS.set_index("dataset").doublets[ds]
-if mode not in ("single", "pooled_cleared", "removed_by_authors"):  # CHANGED: removed_by_authors, deposited cells after the authors' doublet removal
+if mode not in ("single", "pooled_cleared", "removed_by_authors"):  # CHANGED: removed_by_authors
     sys.exit(f"{ds}: doublet design '{mode}' is not a known doublet design (pipeline_py/datasets.tsv)")
 libs = pd.read_csv(INPUT_ROOT / ds / "libraries.tsv", sep="\t", dtype=str, keep_default_na=False)
 _ref = pd.read_csv(REF_DIR / "genes" / "genes.gtf.gz", sep="\t", comment="#", header=None, usecols=[2, 8], dtype=str)  # CHANGED:
@@ -363,7 +363,7 @@ def doublets_library(L, a, lab, record):  # CHANGED: 3. doublets of one library,
 
 def write_outputs(record, lib_rows, final):  # CHANGED: outputs: every labelled cell with each filter's outcome; one h5ad per sample (singlets)
     pd.DataFrame(lib_rows).to_csv(out / "libraries.tsv", sep="\t", index=False)
-    record["kept"] = record.scDblFinder_class.isin(["singlet", "not_run_removed_by_authors"])  # CHANGED: singlets, or deposited cells after the authors' doublet removal
+    record["kept"] = record.scDblFinder_class.isin(["singlet", "not_run_removed_by_authors"])  # CHANGED: doublet design
     cols = ["library", "sample_id", "donor_id", "total_counts", "n_genes_by_counts", "pct_counts_in_top_20_genes",
             "pct_counts_mt", "logit_mt_fraction", "pct_counts_ribo", "pct_counts_hb", "flag_log1p_total_counts",
             "flag_log1p_n_genes_by_counts", "flag_pct_counts_in_top_20_genes", "flag_logit_mt_fraction", "outlier",

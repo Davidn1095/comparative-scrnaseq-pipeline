@@ -1,6 +1,6 @@
 """Paths and dataset sheet for the pipeline (pipeline_py/), which ports the sc-best-practices notebooks
 (theislab/single-cell-best-practices, book commit dd6eb86, 2026-10-19). Per-library inputs are written by
-00_deposited_input.py to $PIPELINE_OUT/input/<dataset>/ (layout in its docstring)."""
+00_inputs.py to $PIPELINE_OUT/input/<dataset>/ (layout in its docstring)."""
 import os
 from pathlib import Path
 
@@ -13,7 +13,7 @@ DEV_ROOT = Path(os.environ.get("PIPELINE_OUT", REPO / "out"))  # outputs
 INPUT_ROOT = DEV_ROOT / "input"
 OUT_ROOT = DEV_ROOT / "py"
 REF_DIR = Path(os.environ.get("REF_DIR", REPO / "refdata" / "refdata-gex-GRCh38-2024-A"))  # Cell Ranger reference
-DATA_ROOT = Path(os.environ.get("DATA_ROOT", REPO / "data"))  # raw downloads, data/<disease>/<accession>/ (README)
+DATA_ROOT = Path(os.environ.get("DATA_ROOT", REPO / "data"))  # raw downloads, data/<disease>/<accession>/
 DATASETS = pd.read_csv(PIPELINE_DIR / "datasets.tsv", sep="\t", comment="#", dtype=str)
 
 # scDblFinder's default expected doublet rate per 1,000 cells (scDblFinder 1.26.9,
@@ -34,7 +34,7 @@ def log(*a):
 EXCLUDED_LABELS = ("low quality", "platelets")
 
 
-# markers of the supplementary atlas dot plot (09_supplementary_data.py, 10_supplementary.R), per final cell
+# markers of the supplementary atlas dot plot (07_figure_data.py, 08_figures.R), per final cell
 # type in the figures' order: positive markers named in 03_annotation/manual_annotation.tsv. Illustrative only, not used
 # for annotation (step 03 uses the curated markers below)
 SUPP_DOTPLOT_MARKERS = {
@@ -102,7 +102,7 @@ def curated_markers():
 
 
 # batch for the DE design and the composition formula. Equal to the dataset, except for Perez,
-# where it is the authors' processing cohort (Processing_Cohort, deposited per sample; 00_deposited_input.py writes it
+# where it is the authors' processing cohort (Processing_Cohort, deposited per sample; 00_inputs.py writes it
 # to input/Perez/donors.tsv as processing_cohort): Perez_1 to Perez_4. Perez's batches are unbalanced between SLE and
 # controls (batch 1 controls only, batch 2 mostly SLE), so the batch is modelled like a dataset.
 def batch_of(obs):

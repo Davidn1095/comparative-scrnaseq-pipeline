@@ -14,9 +14,9 @@ all-zero rows for absent genes, which gene_map.tsv lists); the step 02 merge kee
 datasets. Counts must be non-negative integers.
 
 Cell Ranger route (CHANGED 2026-10-28): for Perez and GSE253568 the counts are our Cell
-Ranger 10.0.0 outputs (data/<disease>/<accession>/cellranger/<library>/, written by cellranger.sh), and only the
+Ranger 10.0.0 outputs (home copies under data/<disease>/<dataset>/cellranger/<library>/), and only the
 labels come from the deposited objects (Perez: the h5ad's barcode, sample and donor; GSE253568: the
-hashtag labels with the hashtag-genotype rule of 00_gse253568_genotype_labels.py; intersection rule from 2026-11-02). CHANGED 2026-11-01: the
+hashtag labels with the hashtag-genotype rule of 00_genotype.py; intersection rule from 2026-11-02). CHANGED 2026-11-01: the
 counts are exon-only, rebuilt from Cell Ranger's molecule_info.h5 (molecules with umi_type 1) into
 input/<dataset>/<library>/filtered_feature_bc_matrix.h5 and raw_feature_bc_matrix.h5, keeping Cell Ranger's
 cell calls; libraries.tsv points to them. Labelled cells that our Cell Ranger does not call are dropped and
@@ -24,7 +24,7 @@ counted; n_called is Cell Ranger's called-cell count. Their earlier deposited-ma
 removed so that it cannot be used by mistake; so is GSE157278's (excluded; a public-FASTQ
 dataset, which would go through Cell Ranger if it were included again).
 
-Usage: python 00_deposited_input.py <dataset>
+Usage: python 00_inputs.py <dataset>
 """
 import gzip
 import os
@@ -37,16 +37,17 @@ import pandas as pd
 import scipy.io
 import scipy.sparse as sp
 
-from config import DATA_ROOT, DEV_ROOT, INPUT_ROOT, PIPELINE_DIR, REF_DIR, log, write_10x_h5
+from config import DATA_ROOT, DEV_ROOT, INPUT_ROOT, REF_DIR, log, write_10x_h5
 
-RAW = {  # raw downloads per dataset (README); "Perez" is GSE174188
+REPO = Path(os.environ.get("ATLAS_ROOT", Path(__file__).resolve().parent.parent))
+RAW = {
     "Perez": DATA_ROOT / "SLE/GSE174188",
     "GSE253568": DATA_ROOT / "SjD/GSE253568",
     "GSE135779_adult": DATA_ROOT / "SLE/GSE135779",
     "GSE316482": DATA_ROOT / "SjD/GSE316482",  # CHANGED 2026-10-29: deposited-matrix route
     "HRA003613": DATA_ROOT / "SjD/HRA003613",  # CHANGED 2026-10-29: as above
 }
-# CHANGED: Cell Ranger outputs of the public-FASTQ route (cellranger.sh); GSE253568 capture1 is GEM well 1 only
+# CHANGED: Cell Ranger outputs of the public-FASTQ route, data/<disease>/<dataset>/cellranger/<library>/; GSE253568 capture1 is GEM well 1 only
 CELLRANGER = {"Perez": RAW["Perez"] / "cellranger", "GSE253568": RAW["GSE253568"] / "cellranger"}
 CR_DIR = {"GSE253568": {"capture1": "capture1_well1"}}
 CONDITION = {"healthy": "control", "normal": "control", "HD": "control", "sle": "SLE", "SLE": "SLE",
@@ -224,13 +225,13 @@ def perez(ref):
 
 
 def gse253568(ref):
-    s = pd.read_csv(PIPELINE_DIR / "inputs" / "GSE253568_samples.tsv", sep="\t", dtype=str)  # built from GEO (README)
+    s = pd.read_csv(Path(__file__).resolve().parent / "inputs/GSE253568_samples.tsv", sep="\t", dtype=str)
     gl_file = DEV_ROOT / "labels" / "GSE253568" / "donor_labels.tsv"  # CHANGED 2026-11-02: per run root
     if not gl_file.exists():
-        sys.exit(f"GSE253568: {gl_file} missing; run 00_gse253568_genotype_labels.py first")
+        sys.exit(f"GSE253568: {gl_file} missing; run 00_genotype.py labels first")
     gl = pd.read_csv(gl_file, sep="\t", dtype=str)
-    # CHANGED: counts from our Cell Ranger outputs, one library per capture (capture1 = GEM well 1,
-    # the deposited well); labels are the deposited hashtag labels (barcode <10x barcode>_<capture>), and the
+    # CHANGED: counts from our Cell Ranger outputs, one library per capture (capture1 = GEM well 1);
+    # labels are the deposited hashtag labels (barcode <10x barcode>_<capture>), and the
     # deposited matrices and the symbol mapping are no longer read (the test route is removed)
     gl["cr_barcode"] = gl.barcode.str.rsplit("_", n=1).str[0]
     libs = []
@@ -238,7 +239,7 @@ def gse253568(ref):
         cells = pd.DataFrame({"barcode": L.cr_barcode.values, "sample_id": L.sample_id.values,
                               "donor_id": L.sample_id.values})
         # labelled cells not called by our Cell Ranger are dropped first (counted in cellranger_library);
-        # then the hashtag-genotype rule: keep a cell only when vireo agrees with its hashtag (intersection rule)
+        # then the hashtag-genotype rule: keep a cell only when vireo agrees (intersection rule, 2026-11-02)
         row = cellranger_library("GSE253568", lib, cells, ref)
         d = pd.read_csv(row["cells_tsv"], sep="\t", dtype=str)
         kept = set(L.cr_barcode[L.kept == "True"])

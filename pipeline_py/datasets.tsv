@@ -1,10 +1,10 @@
-# Included datasets. route: how counts enter (cellranger = public FASTQ through Cell Ranger, deposited = deposited
-# cell-called matrix). doublets: doublet design (pooled_cleared = pooled libraries whose cross-donor doublets were removed
-# by the authors' demultiplexing; single = one donor per library or per deposited sample; removed_by_authors = deposited
-# cells after the authors' doublet removal, so no second pass). label: short name used in the code ("Perez" = GSE174188).
-dataset	disease	route	doublets	label
-Perez	SLE	cellranger	pooled_cleared	Perez
-GSE135779_adult	SLE	deposited	single	GSE135779
-GSE253568	SjD	cellranger	pooled_cleared	GSE253568
-GSE316482	SjD	deposited	single	GSE316482
-HRA003613	SjD	deposited	removed_by_authors	HRA003613
+# Included datasets. disease: SLE or SjD; each dataset brings its own healthy controls. doublets: the doublet design
+# (pooled_cleared = pooled libraries whose cross-donor doublets the authors removed by demultiplexing; single = one donor
+# per library or per deposited sample; removed_by_authors = deposited cells after the authors' doublet removal, so
+# doublet detection is not run again). label: short name used in the code ("Perez" = GSE174188).
+dataset	disease	doublets	label
+Perez	SLE	pooled_cleared	Perez
+GSE135779_adult	SLE	single	GSE135779
+GSE253568	SjD	pooled_cleared	GSE253568
+GSE316482	SjD	single	GSE316482
+HRA003613	SjD	removed_by_authors	HRA003613

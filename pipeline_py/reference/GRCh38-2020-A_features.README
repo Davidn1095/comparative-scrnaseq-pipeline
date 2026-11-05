@@ -1,5 +1,5 @@
 GRCh38-2020-A_features.tsv.gz (not included: copied from a GEO deposit with no stated licence, so it is not redistributed
-here). Download it into this folder before running 00_deposited_input.py (HRA003613) and 03_annotation.py:
+here). Download it into this folder before running 00_inputs.py (HRA003613) and 03_annotation.py:
 
   GEO GSE316482, sample GSM9453841, file GSM9453841_HC01_scRNAseq_all_cells_features.tsv.gz (a Cell Ranger output; all 21
   samples' features files are identical), saved as GRCh38-2020-A_features.tsv.gz; uncompressed md5

@@ -132,7 +132,7 @@ for _, row in DATASETS.iterrows():  # CHANGED: one fit per dataset, its disease 
         results.append(res_ds)
 
 # CHANGED: fixed-effect (inverse-variance) meta-analysis of the per-cohort log2FC, per disease, cell type and gene
-#: weight w = 1 / SE^2, estimate sum(w * log2FC) / sum(w), SE 1 / sqrt(sum(w)), Wald p, BH within disease
+# weight w = 1 / SE^2, estimate sum(w * log2FC) / sum(w), SE 1 / sqrt(sum(w)), Wald p, BH within disease
 # and cell type; Cochran's Q = sum(w * (log2FC - estimate)^2) on k - 1 degrees of freedom; I^2 = max(0, (Q - (k - 1)) / Q).
 # A gene enters from every cohort where it was tested (passed the filters and has a log2FC and SE).
 pc = pd.concat(results).dropna(subset=["log_fc", "lfcSE"])
