@@ -1,6 +1,6 @@
 # Inputs of the supplementary figures that the step outputs do not hold, drawn by 10_supplementary.R. Not a
 # pipeline step and not a notebook port.
-# Usage: run by make_supplementary.sh (ATLAS_RUN=<folder of 02_integration.py>, default 02_integration)
+# Usage: python 09_supplementary_data.py (ATLAS_RUN=<folder of 02_integration.py>, default 02_integration); then 10_supplementary.R
 # Input: $PIPELINE_OUT/py/atlas/<ATLAS_RUN>/: atlas.h5ad (obs), 03_annotation/cells_manual_annotation.tsv.gz;
 #   $PIPELINE_OUT/py/datasets/<dataset>/01_quality_control/cells.tsv (step 01's outcome of each filter, per cell)
 # Output: $PIPELINE_OUT/py/atlas/<ATLAS_RUN>/09_supplementary/data/

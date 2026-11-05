@@ -37,16 +37,16 @@ numbering of the supplementary items (`supplementary_numbering.tsv`).
 
 ## Software
 
-All steps after read alignment run in one container:
+All steps after read alignment run in one container image:
 
 - Image: `ghcr.io/davidn1095/comparative-scrnaseq-pipeline:atlas-final-2026.10`
   (digest `sha256:09bbfeca81f191614ebc0a644847aea0a27f9b3f59ec9992bbe18a538359d213`)
-- Apptainer/Singularity: `apptainer pull oras://ghcr.io/davidn1095/comparative-scrnaseq-pipeline:atlas-final-2026.10-sif`
-  (SIF sha256 `c7f26ae98de80940c7e4d4565c0a4e60d54344172aa0b877e631d9e7ca4cf89a`)
+- Apptainer/Singularity image (SIF): `oras://ghcr.io/davidn1095/comparative-scrnaseq-pipeline:atlas-final-2026.10-sif`
+  (sha256 `c7f26ae98de80940c7e4d4565c0a4e60d54344172aa0b877e631d9e7ca4cf89a`)
 
-The recipe, package locks and load tests are in `container/`; the build workflows are in `.github/workflows/`.
+The recipe (`container/Dockerfile.atlas-final`) and the package locks (`container/locks/`) are in `container/`.
 Cell Ranger 10.0.0 with the GRCh38-2024-A reference, the SRA Toolkit and pigz run outside the container (`cellranger.sh`).
-Fig 1 needs pdflatex (TeX Live 2024) and the PNG previews Ghostscript, both on the host.
+Fig 1 needs pdflatex (TeX Live 2024) on the host.
 
 Reference files in `pipeline_py/reference/`: the MSigDB Hallmark 2025.1 gene sets are included (CC BY 4.0). Two files are
 not redistributed and must be downloaded first, as their READMEs describe: the CellTypist curated-marker table
@@ -56,35 +56,65 @@ GRCh38, as used by cellsnp-lite (`SNP_PANEL`).
 
 ## Running
 
-Environment (defaults in brackets; `<repo>` is this repository):
+Pull the image once, then run every step from the repository root inside it:
+
+```bash
+apptainer pull atlas.sif oras://ghcr.io/davidn1095/comparative-scrnaseq-pipeline:atlas-final-2026.10-sif
+export PIPELINE_OUT=$PWD/out NUMBA_CACHE_DIR=/tmp/numba PYTHONNOUSERSITE=1
+apptainer exec atlas.sif python pipeline_py/02_integration.py
+apptainer exec atlas.sif Rscript --vanilla pipeline_py/08_figures.R
+```
+
+Apptainer passes the host environment into the container and binds the current folder; folders elsewhere (data,
+reference, outputs) are bound with `--bind` or `APPTAINER_BIND`. Add `--nv` for the GPU in step 02 (scVI).
 
 | Variable | Meaning |
 |---|---|
 | `PIPELINE_OUT` | output folder [`<repo>/out`] |
 | `DATA_ROOT` | raw downloads [`<repo>/data`] |
 | `REF_DIR` | Cell Ranger GRCh38-2024-A reference [`<repo>/refdata/refdata-gex-GRCh38-2024-A`] |
-| `ATLAS_SIF` | the container image [`<repo>/comparative-scrnaseq-pipeline_atlas-final-2026.10.sif`] |
+| `ATLAS_ROOT` | repository root [`<repo>`; the R scripts take the working directory] |
 | `ATLAS_RUN` | folder of the integration run under `$PIPELINE_OUT/py/atlas/` [`02_integration`] |
-| `PIPELINE_BIND` | extra folders to bind into the container, comma-separated |
-| `APPTAINER_MODULE`, `TEX_MODULE`, `CELLRANGER_MODULE`, `SRA_MODULE` | environment modules to load first, if your system uses them |
-| `PIPELINE_LOCAL_TMP` | folder for per-job temporary files [`$TMPDIR`, else `/tmp`] |
+| `NUMBA_CACHE_DIR` | a writable folder for numba's cache (steps 03-06; the image is read-only) |
+| `MANUAL_ANNOTATION` | cluster labels read by `03_annotation.py --apply` [`pipeline_py/inputs/manual_annotation.tsv`] |
+| `ATLAS_SIF`, `SNP_PANEL`, `PIPELINE_LOCAL_TMP` | image, SNP panel and temporary folder of `genotype.sh` and `cellranger.sh` |
 
-Each step runs with `bash pipeline_py/run.sh <script> [args]`, or on Slurm with
-`bash pipeline_py/run.sh --sbatch "<sbatch options>" <script> [args]`, which submits from a read-only snapshot of
-`pipeline_py/`. `cellranger.sh` and `genotype.sh` run on the host (`bash` or `sbatch`).
+Step 03 reads the CellTypist models `Immune_All_Low` and `Immune_All_High` (v2) from `$PIPELINE_OUT/reference/celltypist`;
+download them once before it:
+
+```bash
+apptainer exec atlas.sif python -c "import os; os.environ['CELLTYPIST_FOLDER'] = os.environ['PIPELINE_OUT'] + '/reference/celltypist'; from celltypist import models; models.download_models(model=['Immune_All_Low.pkl', 'Immune_All_High.pkl'])"
+```
+
+Scripts in order (`python pipeline_py/<script>` or `Rscript --vanilla pipeline_py/<script>` inside the image, except
+`cellranger.sh` and `genotype.sh`, which run on the host with `bash` and call the image themselves where needed):
 
 | Order | Script | Step |
 |---|---|---|
 | 0 | `cellranger.sh <dataset> <disease> <library> [SRA runs]` | Cell Ranger per library (GSE174188, GSE253568) |
 | 0 | `genotype.sh capture1_well1 GSE253568 SjD`, then `00_gse253568_genotype_labels.py` | GSE253568 hashtag labels checked by genotype (cellsnp-lite, vireo) |
-| 0 | `00_deposited_input.py <dataset>` | per-library inputs of each dataset |
-| 1 | `01_quality_control.py <dataset> [--stage qc / library / merge]` | quality control, ambient RNA (DecontX), doublets (scDblFinder) |
+| 0 | `00_deposited_input.py <dataset>` | per-library inputs of each dataset (names in `datasets.tsv`) |
+| 1 | `01_quality_control.py <dataset>` | quality control, ambient RNA (DecontX), doublets (scDblFinder); for large datasets in three stages, `--stage qc`, `--stage library <i>` for each library, `--stage merge` |
 | 2 | `02_integration.py` | merge, gene filter, normalisation, highly variable genes, scVI, Leiden |
 | 3 | `03_annotation.py`, then `03_annotation.py --apply` | marker and CellTypist tables; the manual labels of `inputs/manual_annotation.tsv` |
-| 4 | `04_differential_expression.py`; `04b_percohort_de.py` | pseudobulk differential expression; per-cohort analysis and meta-analysis |
-| 5 | `05_composition.py`; `05b_reference_sensitivity.py <base> <reference>`, then `05b_reference_sensitivity.py --summary` | scCODA; refits with five further reference cell types |
+| 4 | `04_differential_expression.py`, then `04b_percohort_de.py` | pseudobulk differential expression; per-cohort analysis and meta-analysis |
+| 5 | `05_composition.py`, then `05b_reference_sensitivity.py <base> <reference>` for each base (`control`, `SLE`) and reference cell type, then `05b_reference_sensitivity.py --summary` | scCODA; refits with five further reference cell types |
 | 6 | `06_pathways.py` | fgsea, MSigDB Hallmark 2025.1 |
-| figures | `make_figures.sh`; `make_supplementary.sh` | Figs 1-4 and Table 1; supplementary figures and tables |
+
+Figures and Table 1, written to `manuscript/figures/` and `manuscript/tables/`:
+
+```bash
+apptainer exec atlas.sif python pipeline_py/07_figure_data.py
+apptainer exec atlas.sif Rscript --vanilla pipeline_py/08_figures.R
+(cd manuscript/figures && pdflatex ../../pipeline_py/fig1_pipeline.tex)   # Fig 1, on the host
+```
+
+Supplementary figures and tables, written to `manuscript/supplementary/`:
+
+```bash
+apptainer exec atlas.sif python pipeline_py/09_supplementary_data.py
+apptainer exec atlas.sif Rscript --vanilla pipeline_py/10_supplementary.R
+```
 
 Dataset names in the code follow `pipeline_py/datasets.tsv`; `Perez` is GSE174188 and `GSE135779_adult` the adult arm of
 GSE135779.

@@ -1,4 +1,5 @@
-# Atlas analysis environment, final (autoimmune-atlas, Genes & Immunity revision); tag atlas-final-2026.10.
+# syntax=docker/dockerfile:1.7
+# Atlas analysis environment, final; tag atlas-final-2026.10.
 # Built from scratch to equal atlas-2026.10c (R 4.6.1, Bioconductor 3.23, Python 3.12) plus cellsnp-lite 1.2.3
 # (htslib 1.24) and vireoSNP 0.5.9, with every version pinned:
 #   base image          by digest (the image atlas-2026.10 was built from, unchanged since 2026-08-11)
@@ -8,9 +9,7 @@
 #                       dependency resolution; vireoSNP constrained to that freeze
 #   cellsnp-lite        the conda build of cellsnp-lite with its 24 dependencies, by URL and MD5
 #                       (locks/cellsnp.conda-explicit.txt), in its own prefix /opt/cellsnp
-# Locks were exported from atlas-2026.10c on 2026-10-28. tests/atlas_final_load_test.py checks the versions (pip freeze,
-# R installed.packages, dpkg, /opt) before the image is pushed.
-# Built by .github/workflows/build-atlas-final.yml.
+# Locks were exported from atlas-2026.10c on 2026-10-28. Build: docker build -f Dockerfile.atlas-final container/
 
 # ---------------------------------------------------------------------------- cellsnp-lite (own conda prefix)
 FROM mambaorg/micromamba:2.5.0@sha256:313021a575cb995a45357e26c48e7979cae278267c28e12c2ecac49c35729c8b AS cellsnp
@@ -59,16 +58,63 @@ RUN set -e && python3 -m venv /opt/venv && \
     python -c "import sys; assert sys.version_info[:3] == (3, 12, 3), sys.version"
 
 # ---------------------------------------------------------------------------- R packages
-COPY build/atlas_final_install.R /tmp/atlas_final_install.R
+COPY <<"INSTALL_R" /tmp/atlas_final_install.R
+# R packages of atlas-final-2026.10: the same top-level installs as Dockerfile.atlas (atlas-2026.10), with
+# CRAN pinned to the Posit Package Manager snapshot of 2026-10-22 (atlas-2026.10 used .../latest on
+# 2026-10-23) and Bioconductor 3.23 (whose 77 packages in atlas-2026.10c were still the current 3.23
+# versions on 2026-10-28). Afterwards every package of the lock (locks/atlas-2026.10c.R.tsv) must be
+# installed at its locked version; a CRAN package that is not is installed at that version from the CRAN
+# archive, and anything else that differs stops the build.
+options(Ncpus = 4L, warn = 1, repos = c(CRAN = "https://p3m.dev/cran/__linux__/noble/2026-10-22"))
+stopifnot(as.character(BiocManager::version()) == "3.23")
+
+cran <- c("Seurat", "SeuratObject", "Matrix", "hdf5r", "reticulate", "pROC", "future",
+          "glmnet", "ranger", "xgboost", "openxlsx2", "msigdbr",
+          "ggplot2", "cowplot", "patchwork", "ggrepel", "ggrastr", "circlize", "magick",
+          "png", "scales", "gtable", "dplyr", "tidyr", "readr", "tibble")
+bioc <- c("SingleR", "celldex", "scDblFinder", "decontX", "DESeq2", "fgsea", "limma",
+          "clusterProfiler", "org.Hs.eg.db", "AnnotationDbi", "SingleCellExperiment",
+          "SummarizedExperiment", "S4Vectors", "BiocParallel", "ExperimentHub",
+          "AnnotationHub", "ComplexHeatmap")
+BiocManager::install(c(cran, bioc), ask = FALSE, update = FALSE)
+BiocManager::install("decontX", type = "source", force = TRUE, update = FALSE, ask = FALSE)
+if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
+remotes::install_github("hrbrmstr/ggchicklet@64c468dd0900153be1690dbfc5cfb35710da8183", upgrade = "never")
+
+lock <- read.delim("/opt/atlas-locks/atlas-2026.10c.R.tsv", colClasses = "character")
+have <- function() {
+  ip <- installed.packages()
+  setNames(ip[, "Version"], ip[, "Package"])
+}
+off <- function() {
+  h <- have()
+  lock[is.na(h[lock$Package]) | h[lock$Package] != lock$Version, ]
+}
+o <- off()
+cran_fix <- o[o$Repository %in% c("CRAN", "RSPM"), ]
+for (k in seq_len(nrow(cran_fix))) {
+  message("installing locked CRAN version ", cran_fix$Package[k], " ", cran_fix$Version[k])
+  remotes::install_version(cran_fix$Package[k], version = cran_fix$Version[k],
+                           repos = "https://cloud.r-project.org", upgrade = "never", dependencies = FALSE)
+}
+o <- off()
+if (nrow(o)) {
+  h <- have()
+  stop("packages not at their locked version: ",
+       paste0(o$Package, " ", o$Version, " (installed ", h[o$Package], ")", collapse = "; "))
+}
+extra <- setdiff(names(have()), lock$Package)
+if (length(extra)) stop("packages not in the lock: ", paste(extra, collapse = ", "))
+library(decontX)
+cat("R packages: all", nrow(lock), "at their locked versions\n")
+INSTALL_R
 RUN Rscript /tmp/atlas_final_install.R
 
-# ---------------------------------------------------------------------------- cellsnp-lite, freezes, tests
+# ---------------------------------------------------------------------------- cellsnp-lite, freezes
 COPY --from=cellsnp /opt/cellsnp /opt/cellsnp
 RUN set -e && ln -s /opt/cellsnp/bin/cellsnp-lite /usr/local/bin/cellsnp-lite && \
     cp /opt/atlas-locks/atlas-2026.10.freeze.txt /opt/atlas-locks/atlas-2026.10b.freeze.txt \
        /opt/atlas-locks/atlas-2026.10c.freeze.txt /opt/
-COPY tests/atlas_load_test.R tests/atlas_load_test.py tests/atlas_b_load_test.py tests/atlas_c_load_test.py \
-     tests/atlas_final_load_test.py /opt/atlas-tests/
 
 RUN rm -rf /tmp/* /var/tmp/* && apt-get clean && rm -rf /var/lib/apt/lists/*
 

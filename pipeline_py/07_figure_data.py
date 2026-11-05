@@ -1,6 +1,6 @@
 # Inputs of the manuscript figures, drawn by 08_figures.R. Not a pipeline step and
 # not a notebook port.
-# Usage: run by make_figures.sh (ATLAS_RUN=<folder of 02_integration.py>, default 02_integration)
+# Usage: python 07_figure_data.py (ATLAS_RUN=<folder of 02_integration.py>, default 02_integration); then 08_figures.R
 # Input: $PIPELINE_OUT/py/atlas/<ATLAS_RUN>/: atlas.h5ad (obs, X_umap), 03_annotation/cells_manual_annotation.tsv.gz,
 #        04_differential_expression/<contrast>/all/de_all_cell_types.tsv
 # Output: $PIPELINE_OUT/py/atlas/<ATLAS_RUN>/07_figures/data/

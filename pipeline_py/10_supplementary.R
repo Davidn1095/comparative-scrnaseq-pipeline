@@ -1,8 +1,8 @@
 #!/usr/bin/env Rscript
 # Supplementary tables and figures that do not depend on the GSE253568 intersect run. Not a pipeline step
 # and not a notebook port; style from figure_style.R (as 08_figures.R).
-# Usage: run by make_supplementary.sh (ATLAS_RUN=<folder of 02_integration.py>, default 02_integration; FIG_DRAFT=1 adds
-#        a DRAFT mark)
+# Usage: Rscript --vanilla pipeline_py/10_supplementary.R, after 09_supplementary_data.py (ATLAS_RUN=<folder of
+#        02_integration.py>, default 02_integration; FIG_DRAFT=1 adds a DRAFT mark)
 # Input: $PIPELINE_OUT/py/atlas/<ATLAS_RUN>/: 04_differential_expression/, 04b_percohort_de/meta.tsv.gz, 05_composition/,
 #        05b_reference_sensitivity/reference_sensitivity.tsv,
 #        06_pathways/, 07_figures/data/indirect_gsea.tsv, 09_supplementary/data/ (composition_counts.tsv, qc_counts.tsv, atlas_cells.tsv.gz, atlas_dotplot.tsv)
@@ -23,7 +23,7 @@ suppressPackageStartupMessages({
 })
 
 ATLAS_RUN <- Sys.getenv("ATLAS_RUN", "02_integration")
-ATLAS_ROOT <- Sys.getenv("ATLAS_ROOT", ".")  # set by run.sh
+ATLAS_ROOT <- Sys.getenv("ATLAS_ROOT", ".")  # repository root (run from it, or set ATLAS_ROOT)
 RUN  <- file.path(Sys.getenv("PIPELINE_OUT", file.path(ATLAS_ROOT, "out")), "py", "atlas", ATLAS_RUN)
 OUT <- Sys.getenv("SUPP_OUT", file.path(ATLAS_ROOT, "manuscript", "supplementary"))
 PIPELINE_DIR <- Sys.getenv("PIPELINE_DIR", file.path(ATLAS_ROOT, "pipeline_py"))

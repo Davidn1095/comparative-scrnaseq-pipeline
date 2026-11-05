@@ -3,8 +3,8 @@
 # (theme_nature(), panel_title(), the bar conventions BAR_RADIUS and stack_outline(), the coloured facet strips
 # class_strips() and the heatmap layout), sized for the Springer Nature artwork guide (175 mm wide, text 5-7 pt). Fig 1 is
 # TikZ (fig1_pipeline.tex).
-# Usage: run by make_figures.sh (ATLAS_RUN=<folder of 02_integration.py>, default 02_integration; FIG_DRAFT=1 adds a
-#        DRAFT mark)
+# Usage: Rscript --vanilla pipeline_py/08_figures.R, after 07_figure_data.py (ATLAS_RUN=<folder of 02_integration.py>,
+#        default 02_integration; FIG_DRAFT=1 adds a DRAFT mark)
 # Input: $PIPELINE_OUT/py/atlas/<ATLAS_RUN>/: 07_figures/data/ (07_figure_data.py), 04_differential_expression/,
 #        05_composition/, 06_pathways/
 # Output, overwritten on each run: manuscript/figures/ ($FIG_OUT) fig2_atlas.pdf, fig3_de.pdf, fig4_pathways.pdf;
@@ -15,7 +15,7 @@ suppressPackageStartupMessages({
 })
 
 ATLAS_RUN <- Sys.getenv("ATLAS_RUN", "02_integration")
-ATLAS_ROOT <- Sys.getenv("ATLAS_ROOT", ".")  # set by run.sh
+ATLAS_ROOT <- Sys.getenv("ATLAS_ROOT", ".")  # repository root (run from it, or set ATLAS_ROOT)
 RUN  <- file.path(Sys.getenv("PIPELINE_OUT", file.path(ATLAS_ROOT, "out")), "py", "atlas", ATLAS_RUN)
 DATA <- file.path(RUN, "07_figures", "data")
 OUT <- Sys.getenv("FIG_OUT", file.path(ATLAS_ROOT, "manuscript", "figures"))

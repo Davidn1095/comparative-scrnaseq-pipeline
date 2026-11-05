@@ -10,7 +10,7 @@
 # "diverging" field, collected on top of pertpy's), acceptance, tree-depth saturation, step size, and per parameter the
 # split R-hat and effective sample size of the single chain.
 # Usage: python 05b_reference_sensitivity.py <base> <reference>   one fit; base control or SLE, the reference with "_" for
-#        spaces (e.g. Regulatory_T); one Slurm job per fit (QOS short)
+#        spaces (e.g. Regulatory_T); the 12 fits (2 bases x 6 references) can run in parallel
 #        python 05b_reference_sensitivity.py --summary              after the 12 fits
 #        (ATLAS_RUN=<folder of 02_integration.py>, default 02_integration)
 # Input: as step 05 (atlas.h5ad obs, 03_annotation/cells_manual_annotation.tsv.gz)

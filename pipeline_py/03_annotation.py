@@ -293,11 +293,11 @@ sc.pp.log1p(adata_celltypist)  # log-transform
 # CHANGED: .X is kept sparse: dense it would take about 126 GB for this atlas, and CellTypist 1.7.1 accepts sparse input
 
 # --- cell 89 ---
-# CHANGED: models.download_models(force_update=True, ...) removed: compute nodes have no internet; Immune_All_Low and
-# Immune_All_High (v2, 2022-07-16) were downloaded once on the login node into CELLTYPIST_FOLDER
+# CHANGED: models.download_models(force_update=True, ...) removed, so that the step runs without internet; Immune_All_Low
+# and Immune_All_High (v2, 2022-07-16) are downloaded once into CELLTYPIST_FOLDER (README)
 missing = [m for m in ["Immune_All_Low.pkl", "Immune_All_High.pkl"] if not (Path(os.environ["CELLTYPIST_FOLDER"]) / "data" / "models" / m).exists()]  # CHANGED: as above
 if missing:  # CHANGED: as above
-    sys.exit(f"CellTypist models missing in {os.environ['CELLTYPIST_FOLDER']}: {missing}; download them on the login node")  # CHANGED: as above
+    sys.exit(f"CellTypist models missing in {os.environ['CELLTYPIST_FOLDER']}: {missing}; download them first (README)")  # CHANGED: as above
 
 # --- cell 91 ---
 model_low = models.Model.load(model="Immune_All_Low.pkl")
