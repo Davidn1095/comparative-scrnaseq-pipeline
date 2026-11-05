@@ -1,0 +1,7 @@
+MSigDB Hallmark gene sets, human, release 2025.1 (gene symbols): h.all.v2025.1.Hs.symbols.gmt
+Source: https://data.broadinstitute.org/gsea-msigdb/msigdb/release/2025.1.Hs/h.all.v2025.1.Hs.symbols.gmt
+Downloaded 2026-10-27; sha256 f22066af72e215ccb7b89d88e492c07e1eef17534c2ca7b0f9902cfecbbdd8e9; 50 gene sets, 32-200 genes each.
+Reference: Liberzon et al. 2015, Cell Syst 1:417-425, doi 10.1016/j.cels.2015.12.004. MSigDB Hallmark gene sets are distributed
+under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); copyright (c) 2004-2025 Broad Institute, Inc., Massachusetts
+Institute of Technology, and Regents of the University of California (MSigDB licence terms, checked 2026-11-05). Redistributed
+unchanged. Used by 06_pathways.py (GSEA).

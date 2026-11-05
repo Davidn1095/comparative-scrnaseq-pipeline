@@ -1,0 +1,10 @@
+celltypist_v2_Basic_celltype_information.xlsx (not included: the source repository states no licence, so the file is not
+redistributed here). Download it into this folder before running 02_integration.py and 03_annotation.py:
+
+  https://github.com/Teichlab/celltypist_wiki/raw/f93881c3f968c9d107774d4e54d4b45a3440b275/atlases/Pan_Immune_CellTypist/v2/tables/Basic_celltype_information.xlsx
+  saved as celltypist_v2_Basic_celltype_information.xlsx; sha256 8f89dcb8baf917595ca2eb16937b8c5afe1e4cd86651a61508fb0445f52964f7
+
+Curated markers of the CellTypist Pan Immune Atlas v2 cell types (Dominguez Conde et al. 2022, Science 376:eabl5197).
+Sheet "Main": 98 low-hierarchy cell types, columns High-hierarchy cell types, Low-hierarchy cell types, Description,
+Cell Ontology ID, Curated markers (three per type). Two symbols are corrected when read (config.py, MARKER_FIX); the file
+is used unchanged.

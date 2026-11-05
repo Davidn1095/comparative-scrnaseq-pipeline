@@ -1,0 +1,79 @@
+\documentclass{article}
+\usepackage[active,tightpage]{preview}
+\setlength\PreviewBorder{0pt}
+\usepackage{tikz}
+\usepackage[T1]{fontenc}
+\usepackage{textcomp}
+\usepackage{tgheros}
+\renewcommand{\familydefault}{\sfdefault}
+\usetikzlibrary{arrows.meta, positioning, calc}
+\PreviewEnvironment{tikzpicture}
+
+% ---------------------------------------------------------------------------
+% Fig 1: analysis pipeline. Built by make_figures.sh with pdflatex (TeX Live 2024).
+% Style: white fill and black 0.9 pt border on every node, rounded corners 2 pt, Title Case node titles, box height
+% 1.1 cm and width the text plus 0.275 cm on each side; 0.7 pt arrows with Stealth tips and 3 pt rounded corners; a tight
+% fork 0.2 cm right of the atlas with branches 1.6 cm on and 0.30 cm above and below its centre line; arrow labels on
+% the horizontal segments. Text sizes follow the Springer Nature artwork guide (5-7 pt sans serif): box titles 7 pt,
+% details 6 pt, arrow labels 5.5 pt. Row 1 runs from the datasets to annotation, row 2 holds the atlas and its results,
+% both rows centred; the row 1 gaps (\rowgap) are set so that the page keeps its width.
+% ---------------------------------------------------------------------------
+\newcommand{\sub}{\fontsize{6}{7.2}\selectfont}
+% row 1 gaps, set so that the page is 398.5 pt wide
+\newlength{\rowgap}\setlength{\rowgap}{19.994pt}
+
+\begin{document}
+\begin{tikzpicture}[
+    every node/.style={text=black, font=\fontsize{7}{8.4}\selectfont},
+    box/.style={rectangle, rounded corners=2pt, draw=black, fill=white, line width=0.9pt,
+                minimum width=3.6cm, minimum height=1.1cm, align=center, inner sep=3pt},
+    % every box as wide as its text plus 0.275 cm on each side
+    fitbox/.style={box, minimum width=0pt, inner xsep=0.275cm},
+    arrow/.style={-{Stealth[length=4pt,width=3pt]}, draw=black, line width=0.7pt, rounded corners=3pt},
+    lab/.style={font=\fontsize{5.5}{6.6}\selectfont, inner sep=1.5pt, align=center}
+]
+
+% ---------- Row 1: datasets to annotation ----------
+\node[fitbox] (input) {scRNA-seq Datasets\\[1pt]\sub SLE and SjD PBMC};
+\node[fitbox, right=\rowgap of input] (qc) {Quality Control\\[1pt]\sub scanpy, DecontX, scDblFinder};
+\node[fitbox, right=\rowgap of qc] (int) {Integration and Clustering\\[1pt]\sub scVI, Leiden};
+\node[fitbox, right=\rowgap of int] (annot) {Annotation\\[1pt]\sub CellTypist markers};
+
+% ---------- Row 2: atlas and results ----------
+% xshift places the row 2 centre under the row 1 centre (both rows centred; extents in the build log)
+\node[fitbox, anchor=west] (atlas) at ([xshift=-156.07pt,yshift=-3.15cm]$(input.west)!0.5!(annot.east)$)
+  {SLE/SjD Atlas};
+\node[fitbox, anchor=south west] at ([xshift=1.6cm,yshift=0.30cm]atlas.east) (comp)
+  {Composition\\[1pt]\sub scCODA};
+\node[fitbox, anchor=north west] at ([xshift=1.6cm,yshift=-0.30cm]atlas.east) (de)
+  {Differential Expression\\[1pt]\sub pseudobulk, PyDESeq2};
+\node[fitbox, right=0.45cm of de] (pw) {Pathway Enrichment\\[1pt]\sub fgsea, Hallmark};
+% Comparisons above Pathway Enrichment, level with Composition (bottoms aligned, same height)
+\node[fitbox, anchor=south] (svs) at ([yshift=0.6cm]pw.north) {Comparisons\\[1pt]\sub SLE vs HC, SjD vs HC, SLE vs SjD (via HC)};
+
+% ---------- Arrows ----------
+\draw[arrow] (input.east) -- (qc.west);
+\draw[arrow] (qc.east) -- (int.west);
+\draw[arrow] (int.east) -- (annot.west);
+\draw[arrow] (annot.south) -- ++(0,-0.5cm) -| (atlas.north);
+\coordinate (fork) at ([xshift=0.2cm]atlas.east);
+\draw[draw=black, line width=0.7pt] (atlas.east) -- (fork);
+\draw[arrow] (fork) -- (fork |- comp.west)
+              -- node[lab, above, midway] {cell-type\\proportions} (comp.west);
+\draw[arrow] (fork) -- (fork |- de.west)
+              -- node[lab, below, midway] {gene\\counts} (de.west);
+\draw[arrow] (de.east) -- (pw.west);
+\draw[arrow] (comp.east) -- (comp.east -| svs.west);
+% Differential Expression -> Comparisons: orthogonal, the rounded corners of every arrow (up, right a third of the way up
+% the 0.6 cm gap, so that the last segment holds a corner, a straight run and the tip; up), left of the Pathway
+% Enrichment arrow
+\coordinate (deA) at ([xshift=-0.3cm]de.north east);
+\coordinate (svsB) at ([xshift=0.6cm]deA |- svs.south);  % 0.6 cm right of the start, under the box
+\draw[arrow] (deA) |- ($(deA)!0.35!(svsB)$) -| (svsB);
+\draw[arrow] (pw.north) -- (svs.south);
+
+% row extents in the build log, to check the centring
+\path let \p1 = (input.west), \p2 = (annot.east), \p3 = (atlas.west), \p4 = (pw.east), \p5 = (svs.east) in
+  \pgfextra{\typeout{FIG1 row1 [\x1, \x2] row2 [\x3, \x4] svs east \x5 }};
+\end{tikzpicture}
+\end{document}

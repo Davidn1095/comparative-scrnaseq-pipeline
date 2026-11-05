@@ -1,0 +1,38 @@
+cluster	label	reason
+leiden_1:0	Naive CD8 T	CD8 with naive markers (CCR7 0.49, SELL 0.60, LEF1), no cytotoxic genes; CellTypist Tcm/naive cytotoxic 0.94
+leiden_1:1	Naive CD4 T	naive markers (CCR7, LEF1, TCF7, SELL), no CD8A or cytotoxic genes; CellTypist Tcm/naive helper 0.99
+leiden_1:2	Naive CD4 T	naive markers (CCR7, TCF7, LEF1, TSHZ2); 66% controls, a condition/dataset split of naive CD4 T
+leiden_1:3	CD8 effector memory T	TEMRA and effector memory CD8 T merged at resolution 1; default effector memory (leiden_2:7 holds 109k of 237k cells, GZMK), TEMRA split below
+leiden_1:4	NK	NK genes (GNLY, NKG7, KLRF1, PRF1) without CD3; CellTypist CD16+ NK 0.98; leiden_2:18 (11k, GZMK, SELL, XCL2) is CD56bright-like NK
+leiden_1:5	Memory CD4 T	CD4 memory genes (AQP3, KLRB1, IL7R, FLT3LG), CCR7 lower, no CD8A
+leiden_1:6	Memory CD4 T	Treg and memory/naive CD4 merged at resolution 1; default memory CD4, split below
+leiden_1:7	low quality	intronic fraction 0.55 (0.14-0.23 elsewhere), ribosomal share 3.9%, 1,093 long-gene DE genes (DPYD, ZBTB20); 79% GSE316482, 17% GSE253568; CellTypist mixed. Excluded downstream
+leiden_1:8	Regulatory T	no single type; leiden_2:8 is proliferating and leiden_2:1 interferon-high CD8, each labelled on its own; the rest labelled Treg
+leiden_1:9	MAIT and gamma-delta T	MAIT genes (SLC4A10 0.34, ZBTB16 0.31, NCR3, KLRB1); CellTypist MAIT 0.91
+leiden_1:10	low quality	ambient-dominated: decontX median 0.38, mixed-lineage genes (H1-4, GNLY, PPBP, ALDOA), CellTypist confidence 0.36; 88% GSE316482. Excluded downstream
+leiden_1:11	platelets	PF4 0.82, PPBP, NRGN, ITGA2B, TUBB1; platelets and platelet-leukocyte complexes. Excluded downstream
+leiden_1:12	Classical monocytes	cDC2 and monocytes merged at resolution 1; default classical monocytes (CD14, S100A12, VCAN), cDC2 split below
+leiden_1:13	Classical monocytes	CD14, S100A8/9/12, VCAN, FCN1
+leiden_1:14	Classical monocytes	CD14 0.75, S100A8/9, FCN1, IFITM3; 78% SLE (interferon-high SLE monocytes)
+leiden_1:15	Non-classical monocytes	FCGR3A 0.93, CX3CR1, MS4A7, CFD, CD14 low
+leiden_1:16	Memory B	MS4A1, CD79A, TNFRSF13B, IGHD lower; CellTypist memory B 0.84, age-associated B 0.15
+leiden_1:17	Naive B	TCL1A 0.63, IGHD 0.76, IGHM, CD22; CellTypist naive B 0.95
+leiden_1:18	pDC	LILRA4, IL3RA 0.69, JCHAIN, IRF8, TCF4; CellTypist pDC 1.00
+leiden_2:16	CD8 effector T (TEMRA)	GZMH, FGFBP2, GNLY in CD8 cells; CellTypist Tem/Temra 0.97
+leiden_2:13	CD8 effector T (TEMRA)	GZMH, GZMB, CX3CR1 0.27; CellTypist CD16+ NK 0.70 (NK-like TEMRA)
+leiden_2:7	CD8 effector memory T	CD8A, GZMK 0.57, CCL5; CellTypist Tem/Trm 0.66 (decided 2026-11-03)
+leiden_2:14	MAIT and gamma-delta T	47k cells, half in MAIT cluster 9: SLC4A10 0.17, ZBTB16 0.22, TRAV1-2 0.07, KLRB1 0.90 (MAIT cluster 0.34, 0.31, 0.14, 0.99; TEMRA and effector memory CD8 0.00-0.01, KLRB1 0.25-0.29)
+leiden_2:5	Memory CD4 T	46k cells, 42k in memory CD4 cluster 5: CD4 0.14, CD8A 0.06, CD8B 0.08, IL7R 0.87, S100A4 0.98, CCR7 0.17, as memory CD4 (effector memory CD8: CD8A 0.45, CD8B 0.49)
+leiden_2:17	platelets	PF4, PPBP, NRGN, ITGA2B; 55 cells
+leiden_2:19	Regulatory T	RTKN2, TIGIT, CD27, ARID5B; CellTypist Treg 0.44, Tcm/naive helper 0.55
+leiden_2:9	Memory CD4 T	AQP3, KLRB1, FLT3LG, IL7R
+leiden_2:12	Naive CD4 T	CCR7, TCF7, LEF1, CD27
+leiden_2:10	Naive CD4 T	CCR7, LEF1, MAL, BCL2; 120 cells
+leiden_2:6	Naive CD4 T	CCR7, TCF7, CD27, LEF1; 239 cells
+leiden_2:4	Naive CD4 T	53k cells, 40k in naive CD4 cluster 1: FOXP3 0.01, IL2RA 0.01, CTLA4 0.02 (Treg 0.21, 0.20, 0.18), CCR7 0.43, SELL 0.60, LEF1 0.37 as naive CD4, with interferon genes (MX1 0.30, IFI44L 0.44): interferon-high naive CD4
+leiden_2:15	low quality	long-gene DE genes (ZBTB20, DOCK10, PRKCH, SKAP1), intronic fraction 0.33 (0.13-0.17 in other CD4 subclusters); 10.3k cells, 8.6k in low-quality cluster 7 (decided 2026-11-03)
+leiden_2:8	Cycling T&NK	proliferating T and NK cells (MKI67 0.42, TOP2A 0.24, PCLAF, STMN1); lineage per cell CD8 T 1,785, T without CD4/CD8 1,925, NK 1,392, CD4 T 417; 5.8k cells; CellTypist term Cycling T&NK (decided 2026-11-03)
+leiden_2:1	Naive CD8 T	962 cells, 721 in naive CD8 cluster 0: CD8B 0.67, CD8A 0.43, CCR7 0.63, SELL 0.81, no FOXP3, IL2RA or CTLA4 (0.00-0.01) and no CD4, with MX1 0.69, IFI44L 0.88: interferon-high naive CD8
+leiden_2:38	HSPC	progenitor markers (CD34 0.30, SPINK2, CRHBP, GATA2, PRSS57); CellTypist HSC/MPP 1.00; 665 cells, a subcluster of low-quality cluster 10
+leiden_2:27	cDC2	19k cells: CD1C 0.40, FCER1A 0.57, CLEC10A 0.52 (classical monocytes 0.01-0.03), CD14 0.42 (monocytes 0.68); some monocytes among them (CellTypist 0.28)
+leiden_2:29	Non-classical monocytes	FCGR3A 0.91, MS4A7, CFD; CellTypist non-classical 0.74
