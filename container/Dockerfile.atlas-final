@@ -110,11 +110,9 @@ cat("R packages: all", nrow(lock), "at their locked versions\n")
 INSTALL_R
 RUN Rscript /tmp/atlas_final_install.R
 
-# ---------------------------------------------------------------------------- cellsnp-lite, freezes
+# ---------------------------------------------------------------------------- cellsnp-lite
 COPY --from=cellsnp /opt/cellsnp /opt/cellsnp
-RUN set -e && ln -s /opt/cellsnp/bin/cellsnp-lite /usr/local/bin/cellsnp-lite && \
-    cp /opt/atlas-locks/atlas-2026.10.freeze.txt /opt/atlas-locks/atlas-2026.10b.freeze.txt \
-       /opt/atlas-locks/atlas-2026.10c.freeze.txt /opt/
+RUN ln -s /opt/cellsnp/bin/cellsnp-lite /usr/local/bin/cellsnp-lite
 
 RUN rm -rf /tmp/* /var/tmp/* && apt-get clean && rm -rf /var/lib/apt/lists/*
 
